@@ -1,0 +1,3293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Eye</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one full-screen stage. The eye sits in the upper half, its words float beneath it. */
+:root {
+  --void: #07060b;
+  --bone: #efe6d8;
+  --dim: #8d8399;
+  --calm: #6fc3b8;
+  --rage: #ff5a43;
+  --font-voice: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-ui: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--void); color: var(--bone);
+  font-family: var(--font-ui); overflow: hidden;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+[hidden] { display: none !important; }
+canvas#eye { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+canvas#arena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+canvas#arena[hidden] { display: none; }
+#peek { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+#peek video { width: 100%; height: 100%; object-fit: fill; transform: scaleX(-1); display: block; }
+body.peek #peek {
+  width: 128px; height: 96px; opacity: 1; border-radius: 10px; border: 1px solid rgba(239,230,216,.2);
+  top: calc(env(safe-area-inset-top, 0px) + 48px); right: max(16px, env(safe-area-inset-right, 0px));
+}
+#peekDot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; border: 2px solid var(--calm); box-shadow: 0 0 8px var(--calm); }
+#peekLabel { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; background: rgba(5,4,7,.7); color: var(--bone); }
+#aside {
+  font: italic 1.05rem/1.3 var(--font-voice); color: var(--dim); margin: 0; min-height: 1.3em; text-align: center;
+  opacity: 0; transform: translateY(4px); transition: opacity .3s, transform .3s;
+}
+#aside.show { opacity: 1; transform: none; }
+.banner {
+  position: fixed; left: 16px; right: 16px; top: calc(env(safe-area-inset-top, 0px) + 58px); z-index: 3;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; pointer-events: none;
+  opacity: 0; transform: translateY(-8px); transition: opacity .35s, transform .35s;
+}
+.banner.show { opacity: 1; transform: none; }
+.banner b { font: italic 400 clamp(2.4rem, 11vw, 4.2rem)/1 var(--font-voice); color: var(--bone); text-shadow: 0 4px 30px rgba(0,0,0,.8); }
+.banner small { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--calm); font-variant-numeric: tabular-nums; }
+.banner.pop b { animation: pop .5s ease-out; }
+@keyframes pop { from { transform: scale(1.5); opacity: 0; } }
+.flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 8; }
+.flash.go { animation: shutter .5s ease-out; }
+@keyframes shutter { 0% { opacity: .95; } 100% { opacity: 0; } }
+.snap { position: fixed; inset: 0; z-index: 7; display: flex; align-items: flex-start; justify-content: center; padding-top: calc(env(safe-area-inset-top, 0px) + 70px); pointer-events: none; }
+.snap figure { margin: 0; padding: 12px 12px 14px; background: #f7f2ea; border-radius: 4px; box-shadow: 0 24px 60px rgba(0,0,0,.65); transform: rotate(-4deg); animation: dropin .6s cubic-bezier(.2,1.4,.4,1); width: min(62vw, 300px); }
+.snap img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: #222; }
+.snap figcaption { margin-top: 10px; text-align: center; font: italic 1.25rem/1.2 var(--font-voice); color: #2a2230; }
+@keyframes dropin { from { transform: translateY(-40px) rotate(-14deg) scale(1.2); opacity: 0; } }
+.hud {
+  display: flex; gap: 18px; align-items: baseline; font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--bone); font-variant-numeric: tabular-nums;
+}
+#hudTime { color: var(--dim); min-width: 4ch; }
+
+.distract { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+#fly { position: absolute; left: 0; top: 0; }
+#fly .bug { position: absolute; left: -9px; top: -6px; width: 18px; height: 12px; border-radius: 50%; background: #2b2430; box-shadow: 0 0 0 1.2px rgba(239,230,216,.75), 0 0 10px rgba(239,230,216,.35); scale: 2; }
+#fly .bug i { position: absolute; top: -7px; width: 10px; height: 8px; border-radius: 50%; background: rgba(220,230,255,.85); box-shadow: 0 0 6px rgba(220,230,255,.6); animation: wing .05s infinite alternate; }
+#fly .bug i:first-child { left: 1px; } #fly .bug i:last-child { left: 7px; }
+@keyframes wing { to { transform: scaleY(.3); } }
+.bait { position: absolute; top: 58%; max-width: min(46vw, 300px); animation: baitin .35s ease-out; }
+.bait.left { left: max(10px, env(safe-area-inset-left, 0px)); }
+.bait.right { right: max(10px, env(safe-area-inset-right, 0px)); }
+@keyframes baitin { from { opacity: 0; transform: translateY(14px); } }
+.toast, .chat {
+  padding: 12px 14px; border-radius: 18px; background: rgba(48,46,58,.97); color: #f4f2f7;
+  font: 600 16px/1.35 -apple-system, system-ui, sans-serif; box-shadow: 0 14px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08);
+}
+.toast div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 400; color: #a9a4b4; margin-bottom: 4px; }
+.toast b { color: #f4f2f7; font-weight: 600; }
+.toast b::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #34c759; margin-right: 6px; }
+.toast p, .chat p { margin: 0; min-height: 1.35em; }
+.chat { background: #2f6df6; border-bottom-left-radius: 4px; }
+.chat .who { font-size: 12px; font-weight: 400; opacity: .8; margin-bottom: 3px; }
+.chat p i { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: #fff; animation: dot 1s infinite; }
+.chat p i:nth-child(2) { animation-delay: .15s; } .chat p i:nth-child(3) { animation-delay: .3s; }
+@keyframes dot { 50% { opacity: .25; transform: translateY(-3px); } }
+.pizza {
+  font: italic 2.4rem/1 var(--font-voice); color: #ffe066; text-shadow: 0 0 12px #ff9d00, 0 0 28px #ff5a00;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transform: rotate(-6deg);
+}
+.pizza .slice { font-style: normal; font-size: 3.6rem; text-shadow: none; }
+.pizza small { font: 700 13px var(--font-ui); letter-spacing: .12em; text-transform: uppercase; }
+.battery {
+  display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-radius: 18px;
+  background: #5a0f14; color: #ffd0c8; font: 700 16px var(--font-ui); letter-spacing: .06em; text-transform: uppercase;
+  box-shadow: 0 0 30px rgba(255,60,40,.55); animation: baitin .35s ease-out, neon .8s steps(2) infinite;
+}
+.battery small { display: block; font-size: 11px; font-weight: 400; opacity: .8; margin-top: 3px; }
+.battery .cell { flex: none; width: 32px; height: 16px; border: 2px solid currentColor; border-radius: 4px; padding: 2px; }
+.battery .cell i { display: block; width: 3px; height: 100%; background: #ff4d3a; }
+@keyframes neon { 50% { opacity: .45; } }
+@media (max-width: 600px) { #fly .bug { scale: 3.2; } .pizza { font-size: 1.9rem; } .pizza .slice { font-size: 3rem; } }
+
+.pairs {
+  --pgap: clamp(24px, 14vw, 220px); /* far apart, so your eyes travel a long way between them */
+  position: fixed; inset: 0; z-index: 5; background: #05040a;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px));
+  transition: opacity .35s;
+}
+.pairs.hide { opacity: 0; }
+.pairs-meta { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); font-variant-numeric: tabular-nums; }
+.pair-row { display: flex; gap: var(--pgap); }
+.pick.dim { opacity: .15; }
+.pick {
+  width: min(calc((100vw - 40px - var(--pgap)) / 2), calc((100dvh - 70px) * .75), 380px); aspect-ratio: 3 / 4;
+  border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  transition: box-shadow .25s, transform .25s, opacity .3s;
+}
+.pick img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; }
+.pick { position: relative; }
+.pick::after { content: ''; position: absolute; left: 0; bottom: 0; height: 7px; width: calc(var(--hold, 0) * 100%); background: var(--calm); box-shadow: 0 0 12px var(--calm); }
+.pick.chosen { box-shadow: 0 0 0 4px var(--calm), 0 0 60px rgba(111,195,184,.6); transform: scale(1.06); }
+.pick.chosen::after { width: 100%; }
+.pick.lost { opacity: .2; transform: scale(.94); }
+.pick.on { box-shadow: 0 0 0 3px var(--calm), 0 0 44px rgba(111,195,184,.45); transform: scale(1.025); }
+.pairs.centering .pick { opacity: .12; }
+.center-dot { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: var(--calm); box-shadow: 0 0 18px var(--calm); opacity: 0; transition: opacity .2s; }
+.pairs.centering .center-dot { opacity: 1; animation: pulse .9s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.6); } }
+.overlay.reading { z-index: 6; background: var(--void); justify-content: flex-start; overflow-y: auto; padding-top: 48px; padding-bottom: 48px; }
+.read-card { display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(100%, 30rem); margin: auto 0; }
+.reading h1 { font-size: clamp(2.6rem, 11vw, 4.6rem); }
+.reading h2 { margin: 6px 0 0; font: 600 11px var(--font-ui); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
+.reading .read-kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+.reading .read-line { font: italic clamp(1.15rem, 4.5vw, 1.45rem)/1.3 var(--font-voice); color: var(--bone); }
+.read-leans p { margin: 0; color: var(--bone); font-size: 14px; line-height: 1.55; opacity: .85; }
+.read-clues { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; text-align: left; width: 100%; }
+.read-clues li { padding: 10px 14px; border-radius: 12px; background: rgba(239,230,216,.05); border: 1px solid rgba(239,230,216,.08); color: var(--bone); font-size: 13px; line-height: 1.5; }
+.read-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 4px 0 0; width: 100%; text-align: left; font-size: 13px; line-height: 1.45; }
+.read-facts dt { color: var(--calm); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding-top: 2px; }
+.read-facts dd { margin: 0; color: var(--bone); }
+.reading .read-twist { font: italic 1rem/1.3 var(--font-voice); color: var(--calm); }
+.read-bars { display: grid; gap: 10px; width: min(100%, 26rem); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.scale-bar { display: grid; grid-template-columns: 6.5rem 1fr 6.5rem; align-items: center; gap: 10px; }
+.scale-bar span:first-child { text-align: right; }
+.scale-bar span:last-child { text-align: left; }
+.scale-bar i { position: relative; height: 4px; border-radius: 2px; background: rgba(239,230,216,.15); }
+.scale-bar b { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: var(--calm); box-shadow: 0 0 10px var(--calm); }
+
+.overlay.setup { z-index: 6; gap: 16px; background: var(--void); }
+/* blink lessons: the setup steps aside and you look at the eye itself, at its pupil */
+.overlay.setup.lesson { background: transparent; justify-content: flex-end; padding-bottom: max(28px, env(safe-area-inset-bottom, 0px)); }
+.overlay.setup.lesson #setupCam, .overlay.setup.lesson .checks { display: none; }
+.setup-say { font: italic clamp(1.4rem, 5vw, 2rem)/1.2 var(--font-voice); color: var(--bone); margin: 0; text-wrap: balance; min-height: 2.4em; display: flex; align-items: flex-end; }
+#setupCam { width: min(60vw, 240px); max-width: 100%; aspect-ratio: 3 / 4; height: auto; border-radius: 22px; background: #000; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; text-align: left; font-size: 12px; color: var(--dim); }
+.checks li { display: flex; align-items: center; gap: 9px; transition: color .3s; }
+.checks li::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; flex: none; }
+.checks li.ok { color: var(--bone); }
+.checks li.tip { color: var(--calm); }
+.checks li.tip::before { border-radius: 2px; background: var(--calm); border-color: var(--calm); }
+.checks li.ok::before { background: var(--calm); border-color: var(--calm); box-shadow: 0 0 8px var(--calm); }
+
+.story {
+  position: fixed; inset: 0; z-index: 5; background: radial-gradient(ellipse at 50% 60%, #1b1426 0%, #08060d 70%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.story-prev { font: italic clamp(.95rem, 3.4vw, 1.15rem)/1.4 var(--font-voice); color: var(--dim); opacity: .45; max-width: 32rem; text-align: center; margin: 0; min-height: 2.8em; text-wrap: pretty; }
+.story-text {
+  font: clamp(1.45rem, 6vw, 2.3rem)/1.3 var(--font-voice); color: var(--bone); max-width: 32rem; text-align: center; margin: 0; min-height: 5.2em; text-wrap: pretty;
+  opacity: 0; transition: opacity .45s ease;
+}
+.story-text.show { opacity: 1; }
+/* the break: cracks spread, the screen jolts, the words fall away */
+.cracks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; }
+.cracks polyline { stroke-width: .32; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.cracks polygon { stroke-width: .4; }
+.cracks g { filter: drop-shadow(0 0 3px rgba(255,255,255,.7)); }
+.story.broken .cracks { opacity: .9; }
+.story.broken .cracks polyline { animation: crack .35s ease-out forwards; }
+@keyframes crack { to { stroke-dashoffset: 0; } }
+.story.broken { animation: jolt .4s ease-out; }
+.story.broken::after { content: ''; position: absolute; inset: 0; background: rgba(255,60,40,.35); animation: flashout .6s ease-out forwards; pointer-events: none; }
+@keyframes flashout { to { opacity: 0; } }
+@keyframes jolt { 15% { transform: translate(-10px, 6px); } 35% { transform: translate(9px, -5px); } 55% { transform: translate(-5px, 3px); } 80% { transform: translate(2px, -1px); } }
+.story.broken .story-text, .story.broken .story-prev { transition: transform 1s cubic-bezier(.5,0,.9,.6), opacity 1s, filter 1s; transform: translateY(45vh) rotate(-7deg); opacity: 0; filter: blur(4px); }
+.stamp { position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%; text-align: center; font: italic 400 clamp(4rem, 22vw, 9rem)/1 var(--font-voice); color: #ff6a52; text-shadow: 0 0 40px rgba(255,60,40,.6); opacity: 0; pointer-events: none; }
+.story.broken .stamp { animation: stamp .9s .15s ease-out forwards; }
+@keyframes stamp { 0% { opacity: 0; transform: scale(2.2); } 25% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.95); } }
+@media (prefers-reduced-motion: reduce) { .story.broken { animation: none; } .story.broken .story-text, .story.broken .story-prev { transform: none; } }
+.story-meta { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 18px); text-align: center; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: rgba(239,230,216,.45); font-variant-numeric: tabular-nums; }
+
+
+.stage {
+  position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  pointer-events: none;
+}
+.speech {
+  width: min(100%, 34rem); min-height: 7.5rem; display: flex; flex-direction: column; align-items: center; gap: 14px;
+  margin-bottom: 6vh;
+}
+#line {
+  font-family: var(--font-voice); font-size: clamp(1.6rem, 5.4vw, 2.6rem); line-height: 1.15;
+  text-align: center; text-wrap: balance; margin: 0; min-height: 1.2em;
+  text-shadow: 0 0 24px rgba(0,0,0,.8);
+  transition: color .4s;
+}
+#line.angry { color: #ffb1a3; animation: tremble .12s infinite; }
+#line.evil { color: #d9a6ff; letter-spacing: .02em; text-shadow: 0 0 18px rgba(176,77,255,.6); }
+#line .caret { display: inline-block; width: .06em; height: .9em; background: currentColor; margin-left: .08em; vertical-align: -.08em; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+@keyframes tremble { 0% { transform: translate(0,0) } 25% { transform: translate(1px,-1px) } 50% { transform: translate(-1px,1px) } 75% { transform: translate(1px,1px) } }
+
+.listen { width: min(100%, 22rem); display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+.listen-label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); text-align: center; }
+.bar { height: 2px; background: rgba(239,230,216,.12); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 100%; background: var(--calm); transform-origin: left; }
+form#reply { display: flex; gap: 8px; }
+#replyText {
+  flex: 1; min-width: 0; font: 16px var(--font-ui); color: var(--bone);
+  background: rgba(239,230,216,.06); border: 1px solid rgba(239,230,216,.18); border-radius: 999px; padding: 10px 16px;
+}
+#replyText:focus { outline: none; border-color: var(--calm); }
+button {
+  font: 600 13px var(--font-ui); letter-spacing: .06em; color: var(--void); background: var(--bone);
+  border: 0; border-radius: 999px; padding: 10px 18px; cursor: pointer;
+}
+button:focus-visible { outline: 2px solid var(--calm); outline-offset: 3px; }
+button.ghost { background: transparent; color: var(--dim); border: 1px solid rgba(239,230,216,.18); }
+
+.status {
+  position: fixed; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim);
+}
+.chips { display: flex; gap: 12px; flex-wrap: nowrap; align-items: center; white-space: nowrap; }
+.chip { display: flex; align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #4a4356; transition: background .3s; }
+.dot.on { background: var(--calm); box-shadow: 0 0 8px var(--calm); }
+.dot.warn { background: #d8a24a; }
+.meter { width: 34px; height: 3px; background: rgba(239,230,216,.12); border-radius: 2px; overflow: hidden; }
+.meter > i { display: block; height: 100%; width: 0; background: var(--calm); }
+.status button { padding: 6px 10px; font-size: 10px; pointer-events: auto; }
+@media (max-width: 420px) { .status { font-size: 10px; letter-spacing: .06em; } .meter { display: none; } }
+
+.overlay {
+  position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+  text-align: center; background: radial-gradient(ellipse at 50% 40%, rgba(26,20,38,.6), rgba(5,4,7,.92));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.overlay h1 { font: italic 400 clamp(3rem, 14vw, 6rem)/1 var(--font-voice); margin: 0; letter-spacing: -.01em; }
+.overlay p { max-width: 30rem; margin: 0; color: var(--dim); font-size: 13px; line-height: 1.7; }
+.overlay .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+@media (prefers-reduced-motion: reduce) { #line.angry { animation: none; } }
+</style>
+</head>
+<body>
+<canvas id="eye" aria-hidden="true"></canvas>
+<canvas id="arena" aria-hidden="true" hidden></canvas>
+<div id="peek"><video id="cam" playsinline muted autoplay></video><i id="peekDot" hidden></i><span id="peekLabel"></span></div>
+
+<!-- Distractions for the "eyes here, buddy" scene -->
+<div class="distract" aria-hidden="true">
+  <div id="fly" hidden><div class="bug"><i></i><i></i></div></div>
+  <div class="bait left pizza" id="pizza" hidden><span class="slice">🍕</span>Free pizza<small id="pizzaCount">ends in 3</small></div>
+  <div class="bait right toast" id="toast" hidden><div><b>Mom</b><span>now</span></div><p id="toastText"></p></div>
+  <div class="bait left chat" id="chat" hidden><div class="who">Sam</div><p id="chatText"><i></i><i></i><i></i></p></div>
+  <div class="bait right battery" id="battery" hidden><span class="cell"><i></i></span><span>Battery 1%<small>Plug in now</small></span></div>
+</div>
+
+<!-- Don't-blink story: vanishes the instant you blink -->
+<div class="story" id="story" hidden>
+  <svg class="cracks" id="cracks" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="none" stroke="#fff" stroke-linejoin="round">
+      <polyline pathLength="1" points="0,0 6,-9 5,-17 12,-26 11,-38 18,-60"/>
+      <polyline pathLength="1" points="0,0 11,-2 19,4 30,2 41,9 70,7"/>
+      <polyline pathLength="1" points="0,0 7,8 6,19 14,27 13,40 22,70"/>
+      <polyline pathLength="1" points="0,0 -5,10 -14,15 -16,27 -27,36 -45,62"/>
+      <polyline pathLength="1" points="0,0 -10,1 -18,-6 -29,-4 -40,-12 -70,-10"/>
+      <polyline pathLength="1" points="0,0 -6,-8 -15,-12 -17,-24 -28,-31 -42,-62"/>
+      <polyline pathLength="1" points="19,4 22,12 30,15"/><polyline pathLength="1" points="-14,15 -21,11 -27,14"/><polyline pathLength="1" points="5,-17 -2,-21 -4,-28"/>
+      <polygon points="0,0 3,-3 4,1" fill="#fff"/>
+    </g>
+  </svg>
+  <div class="stamp" aria-hidden="true">Blink.</div>
+  <div class="story-meta" id="storyClock">0:00 without blinking</div>
+  <p class="story-prev" id="storyPrev"></p>
+  <p class="story-text" id="storyText" aria-live="polite"></p>
+</div>
+
+<!-- Personality read: two pictures, it watches which one you look at -->
+<div class="pairs hide" id="pairs" hidden>
+  <div class="pairs-meta" id="pairsMeta">Warm-up</div>
+  <div class="pair-row">
+    <div class="pick" id="pickL"><img alt=""></div>
+    <div class="pick" id="pickR"><img alt=""></div>
+  </div>
+  <div class="center-dot" aria-hidden="true"></div>
+</div>
+<div class="overlay reading" id="reading" hidden>
+  <div class="read-card">
+    <p class="read-kicker">The eye has read you</p>
+    <h1 id="readTitle"></h1>
+    <p class="read-line" id="readLine"></p>
+    <div class="read-leans" id="readLeans"></div>
+    <h2>What gave you away</h2>
+    <ul class="read-clues" id="readClues"></ul>
+    <dl class="read-facts">
+      <dt>Superpower</dt><dd id="readPower"></dd>
+      <dt>Fatal flaw</dt><dd id="readFlaw"></dd>
+      <dt>In a heist</dt><dd id="readHeist"></dd>
+    </dl>
+    <p class="read-twist" id="readTwist"></p>
+    <div class="read-bars" id="readBars"></div>
+    <div class="row"><button id="readOk" type="button">Accept your fate</button></div>
+  </div>
+</div>
+
+<!-- Camera setup: guides you into position, then learns your blinks -->
+<div class="overlay setup" id="setup" hidden>
+  <p class="setup-say" id="setupSay">Rest your phone on something. Then let me look at you.</p>
+  <canvas id="setupCam" width="300" height="400"></canvas>
+  <ul class="checks">
+    <li class="tip">Phone resting on something, not in your hand</li>
+    <li id="ckFace">Face inside the oval</li>
+    <li id="ckDist">About an arm's length away</li>
+    <li id="ckLevel">Camera at eye level, facing you</li>
+    <li id="ckLight">Enough light on your face</li>
+    <li id="ckBlink">A few blinks, so it learns yours</li>
+  </ul>
+  <button id="setupSkip" type="button">Skip setup and start the game →</button>
+</div>
+
+<div class="status" id="status" hidden>
+  <div class="chips">
+    <span class="chip"><span class="dot" id="seeDot"></span><span id="seeText">camera</span></span>
+    <span class="chip"><span class="dot" id="hearDot"></span><span id="hearText">mic</span><span class="meter"><i id="meter"></i></span></span>
+  </div>
+  <div class="chips">
+    <button class="ghost" id="peekBtn" type="button">Its view</button>
+    <button class="ghost" id="soundBtn" type="button">Sound on</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="speech">
+    <div class="hud" id="hud" hidden><span id="hudScore">You 0 · 0 Eye</span><span id="hudTime">0.0s</span></div>
+    <p id="aside" aria-live="polite"></p>
+    <p id="line" aria-live="polite"></p>
+    <div class="listen" id="listen" hidden>
+      <div class="listen-label" id="listenLabel">Listening. Say something, or type.</div>
+      <div class="bar"><i id="barFill"></i></div>
+      <form id="reply" autocomplete="off">
+        <input id="replyText" type="text" placeholder="Type a reply" aria-label="Your reply">
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="intro">
+  <h1>The Eye</h1>
+  <p>Something in the dark wants to meet you. Let it use your camera so it can look at you, and your microphone so it can hear you answer.</p>
+  <button id="wake" type="button">Wake it</button>
+  <p style="font-size:11px">Face tracking runs on this device. Best in Chrome or Safari.</p>
+</div>
+
+<div class="flash" id="flash" aria-hidden="true"></div>
+<div class="snap" id="snap" hidden><figure><img id="snapImg" alt="Your most ridiculous face"><figcaption id="snapCap"></figcaption></figure></div>
+<div class="banner" id="banner" aria-live="polite"><b id="bannerTitle"></b><small id="bannerSub"></small></div>
+
+<div class="overlay" id="end" hidden>
+  <h1 id="endTitle">The end</h1>
+  <p id="endText"></p>
+  <div class="row"><button id="again" type="button">Play again</button><button id="stop" type="button" class="ghost" hidden>Stop here</button></div>
+</div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const cv = $('#eye'), ctx = cv.getContext('2d');
+const video = $('#cam');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const finePointer = matchMedia('(pointer: fine)').matches;
+
+let W = 0, H = 0;
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+function hex(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t, alpha = 1) {
+  const A = hex(a), B = hex(b);
+  return `rgba(${A.map((v, i) => Math.round(lerp(v, B[i], t))).join(',')},${alpha})`;
+}
+
+// ---------- Eye state (values ease toward their targets every frame) ----------
+// Expression rig. up/lo: lid openness · smile: lower lid curls up · slant: + angry inner lid, − sad
+// droop: outer corner sags · brow*: brow height/tilt/arch/one-sided raise · cock: head tilt
+// anger/joy/evil/sad: colour and effects · bounce/tremble/stretch/laugh: body motion · gazeBias: where it looks when moody
+const NEUTRAL = {
+  up: 1, lo: 1, smile: 0, slant: 0, droop: 0, browY: 0, browTilt: 0, browArch: .5, browQuiz: 0, browW: 1,
+  pupilAdj: 0, anger: 0, joy: 0, evil: 0, sad: 0, cock: 0, bounce: 0, tremble: 0, stretch: 0, laugh: 0,
+  gazeBiasX: 0, gazeBiasY: 0,
+};
+const MOODS = {
+  calm: {},
+  happy: { up: 1, smile: .28, browY: -.3, browArch: .75, pupilAdj: .08, joy: 1, bounce: .35 },
+  delighted: { up: .95, smile: .6, browY: -.55, browArch: .95, pupilAdj: .12, joy: 1, bounce: 1 },
+  quizzical: { up: .72, lo: .9, slant: .2, browQuiz: 1, browTilt: .3, browArch: .3, cock: 1, pupilAdj: -.03, joy: .15, gazeBiasY: -.15 },
+  smug: { up: .42, lo: .85, smile: .45, browQuiz: .75, slant: .15, joy: .35, cock: .5, pupilAdj: -.04 },
+  annoyed: { up: .5, lo: .8, slant: .5, browY: .45, browTilt: .65, browArch: .05, pupilAdj: -.08, anger: .4, browW: 1.25 },
+  angry: { up: .55, lo: .72, slant: .85, browY: .75, browTilt: 1, browArch: 0, pupilAdj: -.16, anger: 1, tremble: .25, browW: 1.6 },
+  sulk: { up: .55, lo: .9, slant: -.25, droop: .4, browY: .25, browTilt: -.4, anger: .15, sad: .3, gazeBiasX: .55, gazeBiasY: .25 },
+  sad: { up: .72, slant: -.55, droop: 1, browY: -.15, browTilt: -1, browArch: .6, pupilAdj: .12, sad: 1, gazeBiasY: .35 },
+  surprised: { up: 1.4, lo: 1.2, browY: -1, browArch: 1, pupilAdj: -.2, stretch: 1, joy: .1 },
+  evil: { up: .62, lo: .7, smile: .35, slant: .6, browY: .35, browTilt: 1, browArch: .1, pupilAdj: -.22, evil: 1, cock: -.3, browW: 1.4 },
+};
+const S = { open: 0, gx: 0, gy: 0, pupil: .38, blink: 0, shake: 0, roll: 0, near: 1, flash: 0, hypno: 0, offX: 0, offY: 0, scale: 1, ...NEUTRAL };
+const T = { open: 0, gx: 0, gy: 0, hypno: 0, offX: 0, offY: 0, scale: 1, ...NEUTRAL }; // offX/scale: move the eye aside and shrink it
+let peekOn = false;
+let glance = null; // forced look somewhere, e.g. at a distraction
+const fly = { on: false, x: 0, y: 0, vx: 3, vy: 2, buzz: 0 };
+let blinkStart = -1, nextBlink = 2500, sacc = { x: 0, y: 0, next: 0 }, wander = { x: 0, y: 0, next: 0 };
+function blink() { blinkStart = performance.now(); }
+function setMood(m) {
+  Object.assign(T, NEUTRAL, MOODS[m]);
+  $('#line').classList.toggle('angry', m === 'angry');
+  $('#line').classList.toggle('evil', m === 'evil');
+  $('#barFill').style.background = m === 'angry' ? 'var(--rage)' : 'var(--calm)';
+  if (m === 'surprised') S.stretch = 1.6; // a little pop on the way in
+}
+
+// Fixed random detail so the eye doesn't flicker
+const fibers = Array.from({ length: 90 }, () => ({ a: Math.random() * Math.PI * 2, l: .55 + Math.random() * .4, light: Math.random() < .5 }));
+const veins = Array.from({ length: 9 }, () => {
+  const side = Math.random() < .5 ? -1 : 1, pts = [];
+  let x = side * (.95 + Math.random() * .1), y = (Math.random() - .5) * .5;
+  for (let i = 0; i < 6; i++) { pts.push([x, y]); x -= side * (.07 + Math.random() * .07); y += (Math.random() - .5) * .14; }
+  return pts;
+});
+
+// ---------- Face tracking ----------
+// lookX/lookY: where YOU are looking, relative to your usual "looking at the screen" pose (+x = your right, +y = down)
+const face = { present: false, x: .5, y: .45, lastSeen: 0, blinking: false, lookX: 0, lookY: 0, ex: {}, roll: 0, near: 1, awaySince: 0, blinks: 0, ear: 0, bl: 0, size: 0, pitch: 0, eyeX: 0, eyeY: 0, yaw: 0, pitchS: 0, noseDy: 0, irisH: .5, irisV: 0, fx: .5, fy: .5 };
+const base = { x: 0, y: 0, size: 0, ear: 0, bl: 0 };
+const GAZE_FLIP = 1; // set to -1 if the eye glances the opposite way to you
+let contest = { active: false, userBlinked: false, lookedAway: false };
+const storyWatch = { active: false, blinked: false, gone: false, graceUntil: 0 };
+const calib = { done: false, bl: .35, earRatio: .7 }; // filled in by the camera setup step
+let landmarker = null, lastVideoTime = -1, camOK = false, trackerDelegate = '', trackedFrames = 0;
+let pointer = null;
+addEventListener('pointermove', e => { pointer = { x: e.clientX, y: e.clientY }; });
+
+async function loadTracker() {
+  try {
+    const v = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+    const { FaceLandmarker, FilesetResolver } = await import(`${v}/vision_bundle.mjs`);
+    const files = await FilesetResolver.forVisionTasks(`${v}/wasm`);
+    const opts = delegate => ({
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', delegate },
+      runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
+    });
+    try { landmarker = await FaceLandmarker.createFromOptions(files, opts('GPU')); trackerDelegate = 'GPU'; }
+    catch { landmarker = await FaceLandmarker.createFromOptions(files, opts('CPU')); trackerDelegate = 'CPU'; }
+  } catch (e) { console.warn('Face tracker failed to load', e); }
+}
+
+// Digital zoom. On wide front cameras (newer iPhones, many laptops at a distance) your face is a small
+// patch of the picture and the tracker loses detail. So once it has found you, it tracks a cut-out around
+// your face instead of the whole frame. Landmarks are mapped back, so nothing else needs to know.
+const crop = { on: false, x: 0, y: 0, w: 1, h: 1, cv: document.createElement('canvas') };
+const cropG = crop.cv.getContext('2d');
+function cropFrame() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!crop.on || !vw) return video;
+  const cw = 640, ch = Math.round(cw * vh / vw);
+  if (crop.cv.width !== cw || crop.cv.height !== ch) { crop.cv.width = cw; crop.cv.height = ch; }
+  cropG.drawImage(video, crop.x * vw, crop.y * vh, crop.w * vw, crop.h * vh, 0, 0, cw, ch);
+  return crop.cv;
+}
+function uncrop(raw) {
+  if (!crop.on) return raw;
+  return raw.map(q => ({ x: crop.x + q.x * crop.w, y: crop.y + q.y * crop.h, z: q.z }));
+}
+function aimCrop(lm) { // lm in whole-frame coordinates
+  const l = lm[234], r = lm[454], c = lm[168], fw = Math.hypot(r.x - l.x, r.y - l.y);
+  const w = clamp(fw * 3.6, .4, 1); // face fills a bit under a third of the cut-out, with room to shake your head
+  if (w > .9) { crop.on = false; crop.w = crop.h = 1; crop.x = crop.y = 0; return; }
+  // The cut-out stays put while you move inside it. The tracker follows you frame to frame inside the picture
+  // it's given, so sliding the picture around every frame (e.g. while you shake your head) throws it off.
+  // It only jumps when you drift near its edge or your face changes size a lot.
+  if (crop.on) {
+    const dx = (c.x - (crop.x + crop.w / 2)) / crop.w, dy = (c.y - (crop.y + crop.h * .45)) / crop.h;
+    if (Math.abs(dx) < .2 && Math.abs(dy) < .2 && Math.abs(w / crop.w - 1) < .3) return;
+  }
+  crop.w = crop.h = w;
+  crop.x = clamp(c.x - w / 2, 0, 1 - w);
+  crop.y = clamp(c.y - w * .45, 0, 1 - w);
+  crop.on = true;
+}
+
+let frameGap = 33, lastTrackAt = 0;
+const dip = { start: 0, counted: false };
+function onBlink(now) {
+  if (storyWatch.active && now > storyWatch.graceUntil) { storyWatch.blinked = true; breakStory(); } // don't-blink story: it cracks and falls apart
+  face.blinks++;
+  if (contest.active) { if (now > contest.graceUntil) contest.userBlinked = true; }
+  else setTimeout(blink, 110); // it blinks back at you
+}
+
+function track(now) {
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime; trackedFrames++;
+  const res = landmarker.detectForVideo(cropFrame(), now);
+  const raw = res.faceLandmarks?.[0];
+  if (!raw) { if (now - face.lastSeen > 300) crop.on = false; if (now - face.lastSeen > 600) { face.present = false; face.awaySince = 0; } return; }
+  const lm = uncrop(raw);
+  aimCrop(lm); face.lm = lm;
+
+  const p = lm[168], l = lm[234], r = lm[454], a = lm[33], b = lm[263], nose = lm[1];
+  face.x = p.x; face.y = p.y; face.present = true; face.lastSeen = now;
+  const size = Math.hypot(r.x - l.x, r.y - l.y);
+  const yaw = (nose.x - (l.x + r.x) / 2) / size;   // camera image is unmirrored: + means you turned to your left
+  face.roll = Math.atan2(b.y - a.y, b.x - a.x);
+
+  const bs = res.faceBlendshapes?.[0]?.categories || [];
+  const score = n => bs.find(c => c.categoryName === n)?.score || 0;
+  // Blink = the tracker's blink score OR the eyelid gap shrinking, each against your own open-eye baseline
+  const gap = (t, b, o, i) => Math.hypot(lm[t].x - lm[b].x, lm[t].y - lm[b].y) / Math.hypot(lm[o].x - lm[i].x, lm[o].y - lm[i].y);
+  const ear = (gap(159, 145, 33, 133) + gap(386, 374, 263, 362)) / 2;
+  const bl = (score('eyeBlinkLeft') + score('eyeBlinkRight')) / 2;
+  if (!base.ear) { base.ear = ear; base.bl = bl; }
+  face.ear = ear; face.bl = bl; face.size = size;
+  const m = res.facialTransformationMatrixes?.[0]?.data;
+  if (m) face.pitch = Math.atan2(m[6], m[10]); // head nod angle; only its size matters to us
+  // Thresholds: tuned to your own blinks once calibrated, otherwise sensitive defaults
+  const closed = (calib.done
+    ? bl > calib.bl || ear < base.ear * calib.earRatio
+    : bl > Math.max(.33, base.bl + .18) || ear < base.ear * .7)
+    || bl > .55 || ear < base.ear * .55; // a clear, full blink always counts, whatever the calibration said
+  if (!closed) { base.ear = lerp(base.ear, ear, .03); base.bl = lerp(base.bl, bl, .03); }
+  face.smile = (score('mouthSmileLeft') + score('mouthSmileRight')) / 2;
+  { // expressions, for copycat
+    const bL = score('eyeBlinkLeft'), bR = score('eyeBlinkRight'), oL = score('browOuterUpLeft'), oR = score('browOuterUpRight');
+    face.ex = {
+      smile: face.smile, jaw: score('jawOpen'), pucker: score('mouthPucker'),
+      browUp: Math.max(score('browInnerUp'), (oL + oR) / 2), browDown: (score('browDownLeft') + score('browDownRight')) / 2,
+      browOne: Math.abs(oL - oR), squint: (score('eyeSquintLeft') + score('eyeSquintRight')) / 2,
+      wink: Math.max(bL, bR) > .5 ? Math.abs(bL - bR) : 0,
+    };
+  }
+  // Slow cameras (common on mid-range Android phones, or in dim light) take a picture only every 60-100 ms,
+  // so a quick blink can fall between pictures and never look fully shut. When frames are slow, a short,
+  // partial dip that opens again within half a second counts too. Looking down lasts longer, so it doesn't.
+  frameGap = lerp(frameGap, Math.min(now - lastTrackAt, 250), .1); lastTrackAt = now;
+  const dipping = ear < base.ear * .8 || bl > base.bl + .2;
+  if (dipping && !dip.start) { dip.start = now; dip.counted = false; }
+  if (closed) dip.counted = true;
+  if (!dipping && dip.start) {
+    if (!dip.counted && frameGap > 45 && now - dip.start < 500) onBlink(now);
+    dip.start = 0;
+  }
+  if (closed && !face.blinking) onBlink(now);
+  face.blinking = closed;
+  if (closed) return; // gaze readings are junk mid-blink
+
+  const lookRight = (score('eyeLookOutRight') + score('eyeLookInLeft')) / 2;
+  const lookLeft = (score('eyeLookOutLeft') + score('eyeLookInRight')) / 2;
+  const up = (score('eyeLookUpLeft') + score('eyeLookUpRight')) / 2;
+  const down = (score('eyeLookDownLeft') + score('eyeLookDownRight')) / 2;
+  const gx = GAZE_FLIP * (lookRight - lookLeft) - yaw * 1.5, gy = down - up;
+  // smoothed raw eye + head signals, so small glances at things on screen show up
+  face.eyeX = lerp(face.eyeX, lookRight - lookLeft, .4); face.eyeY = lerp(face.eyeY, gy, .4);
+  face.yaw = lerp(face.yaw, yaw, .4); face.pitchS = lerp(face.pitchS, face.pitch, .4);
+  face.noseDy = lerp(face.noseDy, (nose.y - p.y) / size, .4); // grows when you nod down
+  if (lm.length > 473) { // where each iris sits between its eye corners: across (h) and above/below the corner line (v)
+    const irisAt = (A, B, I) => {
+      const ex = B.x - A.x, ey = B.y - A.y, L2 = ex * ex + ey * ey || 1e-6, dx = I.x - A.x, dy = I.y - A.y;
+      return [(dx * ex + dy * ey) / L2, (dx * ey - dy * ex) / L2];
+    };
+    const e1 = irisAt(lm[33], lm[133], lm[468]), e2 = irisAt(lm[362], lm[263], lm[473]);
+    face.irisH = lerp(face.irisH, (e1[0] + e2[0]) / 2, .5); face.irisV = lerp(face.irisV, (e1[1] + e2[1]) / 2, .5);
+  }
+  face.fx = p.x; face.fy = p.y;
+
+  // Slowly learn your normal pose, so staring at the screen counts as "looking at me"
+  if (!base.size) Object.assign(base, { x: gx, y: gy, size });
+  face.lookX = gx - base.x; face.lookY = gy - base.y; face.near = size / base.size;
+  const away = Math.abs(face.lookX) > .3 || face.lookY < -.28 || face.lookY > .35;
+  if (!away) { base.x = lerp(base.x, gx, .01); base.y = lerp(base.y, gy, .01); }
+  base.size = lerp(base.size, size, .004);
+  if (away && !face.awaySince) face.awaySince = now;
+  if (!away) face.awaySince = 0;
+}
+
+// ---------- Little remarks when it notices what you do ----------
+let live = false;
+const cool = {};
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+let asideTimer = null;
+function aside(text, ms = 2600) {
+  const el = $('#aside');
+  el.textContent = text; el.classList.add('show');
+  clearTimeout(asideTimer); asideTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+function react(key, text, ms = 14000) {
+  const now = performance.now();
+  if ((cool[key] || 0) > now) return;
+  cool[key] = now + ms; aside(text);
+}
+function reactions(now) {
+  if (!live || !landmarker || !camOK) return;
+  if (!face.present) { if (face.lastSeen && now - face.lastSeen > 1500) react('gone', 'Hey. Where did you go?', 10000); return; }
+  if (face.awaySince && now - face.awaySince > 900) react('away', pick(['Eyes on me.', 'What are you looking at?', 'I\'m over here.', 'Ahem.']), 9000);
+  if (face.near > 1.35) react('near', 'Whoa. Personal space.');
+  else if (face.near < .7) react('far', 'Come back. You\'re getting small.');
+  if (Math.abs(face.roll) > .3) react('tilt', pick(['Why is your head sideways?', 'Tilting won\'t help you understand me.']), 20000);
+  if (face.smile > .55) react('smile', pick(['Is that a smile? Gross. Do it again.', 'Don\'t smile at me. I\'ll blush. Somehow.']), 20000);
+}
+
+// ---------- Microphone: voice activity + optional speech-to-text ----------
+let audioCtx = null, analyser = null, buf = null, noiseFloor = .01, level = 0, micOK = false;
+let soundOn = true;
+let recog = null, transcript = '';
+
+function setupMic(stream) {
+  if (!stream.getAudioTracks().length) return;
+  analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  buf = new Float32Array(analyser.fftSize); micOK = true;
+}
+function readLevel() {
+  if (!analyser) return 0;
+  analyser.getFloatTimeDomainData(buf);
+  let s = 0; for (const v of buf) s += v * v;
+  return Math.sqrt(s / buf.length);
+}
+function setupSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  try {
+    recog = new SR(); recog.continuous = true; recog.interimResults = true; recog.lang = navigator.language || 'en-US';
+    recog.onresult = e => {
+      if (!replyResolver) return; // ignore leftovers from an earlier answer
+      transcript = Array.from(e.results).map(r => r[0].transcript).join(' ').trim();
+      const last = e.results[e.results.length - 1];
+      if (last.isFinal && transcript) heard(transcript);
+    };
+    recog.onerror = () => {};
+  } catch { recog = null; }
+}
+
+// ---------- Sound ----------
+let master = null; // everything goes through here, so the whole game can be louder
+const VOLUME = 2.6;
+function out() {
+  if (!master) { master = audioCtx.createGain(); master.gain.value = VOLUME;
+    const comp = audioCtx.createDynamicsCompressor(); // keeps the louder mix from crackling
+    master.connect(comp).connect(audioCtx.destination);
+  }
+  return master;
+}
+function tone(freq, dur, gain, type = 'triangle') {
+  if (!audioCtx || !soundOn) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = audioCtx.currentTime;
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g).connect(out()); o.start(t); o.stop(t + dur);
+}
+function drone(sec) { // low hypnotic hum
+  if (!audioCtx || !soundOn) return;
+  const t = audioCtx.currentTime, g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.05, t + 1); g.gain.linearRampToValueAtTime(0, t + sec);
+  g.connect(out());
+  for (const f of [110, 164.8, 111.5]) {
+    const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+    o.connect(g); o.start(t); o.stop(t + sec);
+  }
+}
+$('#peekBtn').onclick = () => { peekOn = document.body.classList.toggle('peek'); $('#peekBtn').textContent = peekOn ? 'Hide view' : 'Its view'; };
+$('#soundBtn').onclick =() => { soundOn = !soundOn; $('#soundBtn').textContent = soundOn ? 'Sound on' : 'Sound off'; };
+
+// ---------- Talking and listening ----------
+// Lines queue up: a new line waits for the current one to finish typing, so nothing gets cut off.
+let sayChain = Promise.resolve();
+function say(text, speed = 42) {
+  const run = sayChain.then(() => typeLine(text, speed));
+  sayChain = run.catch(() => {});
+  return run;
+}
+async function typeLine(text, speed) {
+  const el = $('#line');
+  el.innerHTML = '';
+  const span = document.createElement('span'), caret = document.createElement('span');
+  caret.className = 'caret'; el.append(span, caret);
+  for (const ch of text) {
+    span.textContent += ch;
+    if (ch.trim()) tone(T.anger > .5 ? 180 + Math.random() * 40 : 560 + Math.random() * 90, .03, .018);
+    await sleep(/[.?!]/.test(ch) ? speed * 9 : ch === ',' ? speed * 5 : speed);
+  }
+  caret.remove();
+}
+
+let replyResolver = null;
+function heard(text) { if (replyResolver) replyResolver(text); }
+function waitForReply(ms, label = 'Listening. Say something, or type.') {
+  return new Promise(resolve => {
+    transcript = ''; voiceMs = 0;
+    $('#listenLabel').textContent = label;
+    $('#listen').hidden = false; $('#replyText').value = '';
+    const fill = $('#barFill');
+    fill.style.transition = 'none'; fill.style.transform = 'scaleX(1)';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      fill.style.transition = `transform ${ms}ms linear`; fill.style.transform = 'scaleX(0)';
+    }));
+    if (finePointer) $('#replyText').focus();
+    try { recog?.start(); } catch {}
+    let done = false, voiceTimer = null, typeTimer = null;
+    const box = $('#replyText');
+    const finish = r => {
+      if (done) return; done = true;
+      clearTimeout(timer); clearTimeout(voiceTimer); clearTimeout(typeTimer);
+      box.removeEventListener('focus', typing); box.removeEventListener('input', typing);
+      replyResolver = null; listeningVoice = null;
+      $('#listen').hidden = true; box.blur();
+      try { recog?.stop(); } catch {}
+      resolve(r);
+    };
+    // Time's up: anything half-typed or half-heard still counts as an answer
+    const timeUp = () => {
+      const t = box.value.trim() || transcript;
+      finish(t ? { replied: true, text: t } : { replied: false });
+    };
+    const holdBar = label => { fill.style.transition = 'none'; fill.style.transform = 'scaleX(1)'; $('#listenLabel').textContent = label; };
+    const timer = setTimeout(timeUp, ms);
+    replyResolver = text => finish({ replied: true, text: text || '' });
+    // Typing on a phone takes a while (keyboard, autocorrect…): stop the countdown once they start,
+    // and only give up after a long pause with nothing typed
+    const typing = () => {
+      clearTimeout(timer); clearTimeout(typeTimer); listeningVoice = null;
+      holdBar('Type it, then press Enter.');
+      typeTimer = setTimeout(timeUp, box.value.trim() ? 6000 : 15000);
+    };
+    box.addEventListener('focus', typing); box.addEventListener('input', typing);
+    // Voice detected: stop the countdown and give speech-to-text time to catch up (slow on some Android phones)
+    listeningVoice = () => {
+      clearTimeout(timer);
+      holdBar('It hears you…');
+      const t0 = performance.now();
+      const check = () => {
+        if (transcript || !recog || performance.now() - t0 > 4000) finish({ replied: true, text: transcript });
+        else voiceTimer = setTimeout(check, 300);
+      };
+      voiceTimer = setTimeout(check, recog ? 1600 : 500);
+      listeningVoice = null;
+    };
+  });
+}
+let listeningVoice = null, voiceMs = 0;
+$('#reply').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#replyText').value.trim();
+  if (v) heard(v);
+});
+
+// ---------- Render loop ----------
+let lastT = performance.now();
+function frame(now) {
+  const dt = Math.min(50, now - lastT); lastT = now;
+  track(now);
+
+  // mic level and voice activity
+  const rms = readLevel();
+  level = lerp(level, rms, .3);
+  const thr = Math.max(.02, noiseFloor * 3.5);
+  if (replyResolver) {
+    voiceMs = rms > thr ? voiceMs + dt : Math.max(0, voiceMs - dt * .5);
+    if (voiceMs > 300 && listeningVoice) listeningVoice();
+  } else if (micOK) noiseFloor = lerp(noiseFloor, rms, .01);
+  $('#meter').style.width = `${clamp(level / (thr * 2), 0, 1) * 100}%`;
+
+  // where to look
+  if (face.present) {
+    // look at where your face is, and glance wherever your eyes go
+    T.gx = clamp(-(face.x - .5) * 3.4 + face.lookX * 1.3, -1, 1);
+    T.gy = clamp((face.y - .45) * 3 + face.lookY * 1.1, -1, 1);
+  } else if (!camOK && pointer) {
+    T.gx = clamp((pointer.x - W / 2) / (W * .45), -1, 1);
+    T.gy = clamp((pointer.y - H * .42) / (H * .45), -1, 1);
+  } else {
+    if (now > wander.next) { wander = { x: (Math.random() - .5) * 1.5, y: (Math.random() - .5) * .9, next: now + 900 + Math.random() * 1400 }; }
+    T.gx = wander.x; T.gy = wander.y;
+  }
+  if (glance && now < glance.until) { T.gx = glance.x; T.gy = glance.y; }
+  if (fly.on) { // a fly that wanders the screen, buzzing
+    fly.vx = clamp(fly.vx + (Math.random() - .5) * .9, -6, 6); fly.vy = clamp(fly.vy + (Math.random() - .5) * .9, -6, 6);
+    fly.x += fly.vx; fly.y += fly.vy;
+    // it buzzes in a band below the eye, never across it: looking at the eye must not count as looking at the fly
+    const top = H * .62, bot = H * .74;
+    if (fly.x < 30 || fly.x > W - 30) fly.vx *= -1;
+    if (fly.y < top || fly.y > bot) fly.vy *= -1;
+    fly.x = clamp(fly.x, 30, W - 30); fly.y = clamp(fly.y, top, bot);
+    $('#fly').style.transform = `translate(${fly.x}px, ${fly.y}px) rotate(${Math.atan2(fly.vy, fly.vx)}rad)`;
+    if (now > fly.buzz) { tone(190 + Math.random() * 40, .18, .012, 'sawtooth'); fly.buzz = now + 220; }
+  }
+  if (now > sacc.next) sacc = { x: (Math.random() - .5) * .1, y: (Math.random() - .5) * .08, next: now + 700 + Math.random() * 2000 };
+
+  const k = 1 - Math.pow(1 - .2, dt / 16.7);
+  const calmEyes = 1 - Math.max(S.anger, S.evil); // angry or scheming eyes lock on, no wandering
+  S.gx = lerp(S.gx, clamp(T.gx + S.gazeBiasX, -1, 1) + sacc.x * calmEyes, k);
+  S.gy = lerp(S.gy, clamp(T.gy + S.gazeBiasY, -1, 1) + sacc.y * calmEyes, k);
+  const slow = 1 - Math.pow(1 - .06, dt / 16.7);
+  S.open = lerp(S.open, T.open, slow); S.hypno = lerp(S.hypno, T.hypno, slow * .6);
+  S.offX = lerp(S.offX, T.offX, slow); S.offY = lerp(S.offY, T.offY, slow); S.scale = lerp(S.scale, T.scale, slow);
+  for (const key in NEUTRAL) S[key] = lerp(S[key], T[key], slow * 1.5);
+  // mirror your head tilt, and swell when you lean in
+  S.roll = lerp(S.roll, face.present ? clamp(-face.roll * .7, -.45, .45) : 0, slow);
+  S.near = lerp(S.near, face.present ? clamp(face.near, .7, 1.5) : 1, slow);
+  S.pupil = lerp(S.pupil, .37 + S.pupilAdj + (S.near - 1) * .18 + .012 * Math.sin(now / 900), slow);
+  S.shake *= Math.pow(.9, dt / 16.7);
+  S.flash *= Math.pow(.92, dt / 16.7);
+  reactions(now);
+  if (peekOn) {
+    const d = $('#peekDot');
+    d.hidden = !face.present;
+    d.style.left = `${(1 - face.x) * 100}%`; d.style.top = `${face.y * 100}%`;
+    $('#peekLabel').textContent = (!face.present ? 'no face' : face.blinking ? 'blink!' : face.awaySince ? 'looked away' : 'locked on') + ` · ${face.blinks} blinks`;
+  }
+
+  if (T.open > .5 && !contest.active && now > nextBlink) { blink(); nextBlink = now + 2800 + Math.random() * 4200; }
+  const bt = blinkStart < 0 ? 1 : (now - blinkStart) / 170;
+  S.blink = bt < 1 ? Math.sin(bt * Math.PI) : 0;
+
+  draw(now);
+  requestAnimationFrame(frame);
+}
+
+function bez(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return [u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0], u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1]];
+}
+
+function draw(now) {
+  // body motion: angry tremble, happy hop, sad sag, evil cackle
+  const shk = reduceMotion ? 0 : S.shake + S.tremble * .35;
+  const hop = reduceMotion ? 0 : -Math.abs(Math.sin(now / 170)) * S.bounce;
+  const cackle = reduceMotion ? 0 : Math.sin(now / 45) * S.laugh;
+  const ew = Math.min(W * .4, H * .3) * (1 + (S.near - 1) * .3) * S.scale, eh = ew * .62;
+  const cx = W / 2 + S.offX * W + (Math.random() - .5) * shk * 14;
+  const cy = H * (.4 + S.offY) + (Math.random() - .5) * shk * 10 + hop * eh * .14 + S.sad * eh * .1 + cackle * eh * .07;
+
+  // the eye's colour mood
+  const tint = (base, joy, ang, evl, sad) => mix2(mix2(mix2(mix2(base, joy, S.joy * .7), ang, S.anger), evl, S.evil), sad, S.sad * .8);
+  const bgIn = tint('#1c1528', '#241a2c', '#3d0a0f', '#2a0a33', '#0f1a2e');
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * .8);
+  bg.addColorStop(0, mix(bgIn, bgIn, 0));
+  bg.addColorStop(1, '#050407');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(S.roll + S.cock * .14);
+  ctx.scale(1 - .06 * S.stretch, 1 + .12 * S.stretch); // surprise stretches it tall
+  ctx.translate(-cx, -cy);
+
+  const o = S.open * (1 - S.blink);
+  const up = eh * o * S.up / .75;
+  const lo = eh * o * .8 * S.lo / .75;
+  const L = [cx - ew, cy - S.droop * eh * .05], R = [cx + ew, cy + S.droop * eh * .22];
+  const u1 = [cx - ew * .45, cy - up * (1 - S.slant)], u2 = [cx + ew * .45, cy - up * (1 + S.slant * .3)];
+  const lowY = cy + lo - S.smile * (lo + eh * .55); // smiling eyes: the lower lid curls up into a crescent
+  const l1 = [cx + ew * .45, lowY], l2 = [cx - ew * .45, lowY];
+
+  const lid = new Path2D();
+  lid.moveTo(...L); lid.bezierCurveTo(...u1, ...u2, ...R); lid.bezierCurveTo(...l1, ...l2, ...L); lid.closePath();
+
+  const glowCol = mix(tint('#6fc3b8', '#f2cf63', '#ff3b2a', '#b04dff', '#5a8cff'), '#000000', 0, .35 * S.open);
+  if (o > .02) {
+    ctx.save();
+    ctx.shadowColor = glowCol; ctx.shadowBlur = 70 + S.evil * 40;
+    const sc = ctx.createRadialGradient(cx, cy, 0, cx, cy, ew);
+    sc.addColorStop(0, '#f7f2ea');
+    sc.addColorStop(.7, mix(tint('#e8ddd2', '#efe4d4', '#f0c4bc', '#e2c4e6', '#e6d6dc'), '#000000', 0));
+    sc.addColorStop(1, mix(tint('#b9a89f', '#c9b8a6', '#b8323c', '#7a2a6e', '#c27a8a'), '#000000', 0));
+    ctx.fillStyle = sc; ctx.fill(lid);
+    ctx.restore();
+
+    ctx.save(); ctx.clip(lid);
+    // veins: angry, evil, or crying
+    const veinA = .1 + S.anger * .7 + S.evil * .4 + S.sad * .3;
+    ctx.strokeStyle = `rgba(190,30,40,${veinA})`; ctx.lineCap = 'round';
+    for (const v of veins) {
+      ctx.lineWidth = 1 + (S.anger + S.evil) * 1.2; ctx.beginPath();
+      v.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, cx + x * ew, cy + y * eh));
+      ctx.stroke();
+    }
+    // iris
+    const ix = cx + S.gx * ew * .42, iy = cy + S.gy * eh * .34, ri = eh * .74;
+    const ig = ctx.createRadialGradient(ix, iy, 0, ix, iy, ri);
+    ig.addColorStop(0, mix(tint('#e2b04a', '#ffd86b', '#ff7a3c', '#ff3d6e', '#9fc4ff'), '#000000', 0));
+    ig.addColorStop(.45, mix(tint('#3b8c86', '#4aa596', '#b3161f', '#6a1a9a', '#3a5f9e'), '#000000', 0));
+    ig.addColorStop(.92, mix(tint('#173f45', '#1d4d50', '#4a070c', '#2a0640', '#16264a'), '#000000', 0));
+    ig.addColorStop(1, '#0b0a0f');
+    ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(ix, iy, ri, 0, Math.PI * 2); ctx.fill();
+    const rp = ri * S.pupil * (1 - .55 * S.hypno);
+    ctx.lineWidth = 1;
+    for (const f of fibers) {
+      ctx.strokeStyle = f.light ? 'rgba(255,240,200,.16)' : 'rgba(0,0,0,.22)';
+      ctx.beginPath();
+      ctx.moveTo(ix + Math.cos(f.a) * rp * 1.05, iy + Math.sin(f.a) * rp * 1.05);
+      ctx.lineTo(ix + Math.cos(f.a + .05) * ri * f.l, iy + Math.sin(f.a + .05) * ri * f.l);
+      ctx.stroke();
+    }
+    if (S.hypno > .01) { // spinning spiral iris
+      ctx.save(); ctx.beginPath(); ctx.arc(ix, iy, ri, 0, Math.PI * 2); ctx.clip();
+      ctx.lineWidth = ri * .13;
+      for (let arm = 0; arm < 2; arm++) {
+        ctx.strokeStyle = arm ? `rgba(25,5,40,${S.hypno})` : `rgba(200,140,255,${S.hypno})`;
+        ctx.beginPath();
+        for (let r = 0; r < ri * 1.2; r += 2) {
+          const ang = -now / 260 + arm * Math.PI + r / ri * 10;
+          ctx[r ? 'lineTo' : 'moveTo'](ix + Math.cos(ang) * r, iy + Math.sin(ang) * r);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // pupil: evil turns it into a slit
+    ctx.fillStyle = '#040305'; ctx.beginPath();
+    ctx.ellipse(ix, iy, rp * (1 - .62 * S.evil), rp * (1 + .35 * S.evil), 0, 0, Math.PI * 2); ctx.fill();
+    // catchlights, plus sparkles when it's thrilled
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.beginPath(); ctx.ellipse(ix - ri * .32, iy - ri * .38, ri * .16 * (1 + S.sad * .4), ri * .12 * (1 + S.sad * .4), -.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.beginPath(); ctx.arc(ix + ri * .28, iy + ri * .3, ri * .05 * (1 + S.sad), 0, Math.PI * 2); ctx.fill();
+    if (S.joy > .5) star(ix + ri * .38, iy - ri * .42, ri * .14 * (S.joy - .5) * 2 * (.8 + .2 * Math.sin(now / 120)));
+    // lid shadow, heavier when it's scheming
+    const sh = ctx.createLinearGradient(0, cy - up * .75, 0, cy - up * .75 + eh * (.5 + S.evil * .3));
+    sh.addColorStop(0, `rgba(20,10,20,${.45 + S.evil * .4 + S.anger * .15})`); sh.addColorStop(1, 'rgba(20,10,20,0)');
+    ctx.fillStyle = sh; ctx.fillRect(cx - ew, cy - eh * 2, ew * 2, eh * 4);
+    ctx.restore();
+  }
+
+  // lid line and lashes
+  const ink = mix(tint('#efe6d8', '#fff1d6', '#ffb1a3', '#e2b6ff', '#cfe0ff'), '#000000', 0, .9);
+  ctx.strokeStyle = ink; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(2, ew * .018);
+  ctx.beginPath(); ctx.moveTo(...L); ctx.bezierCurveTo(...u1, ...u2, ...R); ctx.stroke();
+  if (o > .02) { ctx.lineWidth = Math.max(1, ew * .008); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo(...R); ctx.bezierCurveTo(...l1, ...l2, ...L); ctx.stroke(); ctx.globalAlpha = 1; }
+  ctx.lineWidth = Math.max(1.5, ew * .012);
+  for (let i = 1; i < 14; i++) {
+    const t = i / 14, p = bez(L, u1, u2, R, t), q = bez(L, u1, u2, R, t + .01);
+    let nx = q[1] - p[1], ny = -(q[0] - p[0]); const n = Math.hypot(nx, ny) || 1; nx /= n; ny /= n;
+    if (ny > 0) { nx = -nx; ny = -ny; }
+    const len = ew * .09 * Math.sin(t * Math.PI) * (.4 + .6 * Math.max(o, .3));
+    const side = (t - .5) * 1.2;
+    ctx.beginPath(); ctx.moveTo(...p);
+    ctx.quadraticCurveTo(p[0] + nx * len * .6, p[1] + ny * len * .6, p[0] + (nx + side * .5) * len, p[1] + ny * len * .9);
+    ctx.stroke();
+  }
+
+  // brow: only shows up for a reaction (angry, surprised, suspicious, sad), then fades away again
+  const by = cy - eh * 1.42 + S.browY * eh * .42;
+  const browOn = clamp(Math.max(S.anger, S.evil, S.browQuiz, Math.abs(S.browY) * 1.2, Math.abs(S.browTilt) * .9, S.sad * .8) * 1.4 - .2, 0, 1)
+    * clamp((S.scale - .75) * 4, 0, 1) * Math.min(1, S.open * 1.5); // hidden when the eye is small or shut
+  S.browVis = lerp(S.browVis || 0, browOn, .12);
+  if (S.browVis > .02) {
+    ctx.save(); ctx.globalAlpha = S.browVis;
+    ctx.lineWidth = ew * .045 * S.browW; ctx.lineCap = 'round';
+    ctx.strokeStyle = mix(tint('#efe6d8', '#fff1d6', '#ff8a75', '#c98aff', '#cfe0ff'), '#000000', 0, .9);
+    ctx.beginPath();
+    ctx.moveTo(cx - ew * .75, by + S.browTilt * eh * .6);
+    ctx.quadraticCurveTo(cx - ew * .1, by - eh * .7 * S.browArch + S.browTilt * eh * .12 - S.browQuiz * eh * .4,
+      cx + ew * .75, by - S.browTilt * eh * .28 + eh * .1 - S.browQuiz * eh * .9);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // cartoon anger mark
+  if (S.anger > .55 || S.evil > .6) {
+    const a = Math.max(S.anger, S.evil), mx = cx + ew * 1.05, my = by - eh * .2, s = ew * .09 * (1 + .15 * Math.sin(now / 90));
+    ctx.strokeStyle = S.evil > S.anger ? `rgba(200,120,255,${a})` : `rgba(255,80,60,${a})`; ctx.lineWidth = ew * .022;
+    for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      ctx.beginPath();
+      ctx.moveTo(mx + dx * s * .35, my + dy * s);
+      ctx.quadraticCurveTo(mx + dx * s * .3, my + dy * s * .3, mx + dx * s, my + dy * s * .35);
+      ctx.stroke();
+    }
+  }
+  // tears when it's sad
+  if (S.sad > .3 && o > .1) {
+    const t = (now % 1700) / 1700, tx = R[0] - ew * .18, ty = R[1] + eh * .15 + t * eh * 2.4, tr = ew * .035;
+    ctx.fillStyle = `rgba(150,200,255,${(S.sad - .3) * 1.4 * (1 - t)})`;
+    ctx.beginPath(); ctx.moveTo(tx, ty - tr * 2.2);
+    ctx.quadraticCurveTo(tx + tr * 1.2, ty, tx, ty + tr); ctx.quadraticCurveTo(tx - tr * 1.2, ty, tx, ty - tr * 2.2); ctx.fill();
+  }
+  ctx.restore();
+  if (S.flash > .01) { ctx.fillStyle = `rgba(255,60,40,${S.flash * .35})`; ctx.fillRect(0, 0, W, H); }
+}
+function star(x, y, r) {
+  if (r <= 0) return;
+  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4, rr = i % 2 ? r * .25 : r;
+    ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function mix2(a, b, t) { // hex result so it can feed mix() again
+  const A = hex(a), B = hex(b);
+  return '#' + A.map((v, i) => Math.round(lerp(v, B[i], t)).toString(16).padStart(2, '0')).join('');
+}
+requestAnimationFrame(frame);
+
+// ---------- Status chips ----------
+setInterval(() => {
+  const see = $('#seeDot'), hear = $('#hearDot');
+  see.className = 'dot ' + (face.present ? 'on' : camOK ? 'warn' : '');
+  $('#seeText').textContent = face.present ? 'sees you' : camOK ? (landmarker ? 'looking for you' : 'loading eyes') : 'no camera';
+  hear.className = 'dot ' + (micOK ? 'on' : '');
+  $('#hearText').textContent = micOK ? 'hears you' : 'no mic';
+}, 250);
+
+// ---------- Story ----------
+const quote = s => s.length > 60 ? s.slice(0, 57) + '…' : s;
+
+async function waitForFace(ms) {
+  const end = performance.now() + ms;
+  while (!face.present && performance.now() < end) await sleep(100);
+  return face.present;
+}
+function alarm() { // a two-tone "too close!" alert
+  for (let i = 0; i < 3; i++) { setTimeout(() => tone(1250, .12, .08, 'square'), i * 260); setTimeout(() => tone(950, .12, .08, 'square'), i * 260 + 130); }
+}
+function getAngry() {
+  setMood('angry'); S.shake = 1;
+  tone(70, .7, .08, 'sawtooth'); tone(52, .9, .06, 'sawtooth');
+}
+async function evilLaugh() {
+  setMood('evil'); T.laugh = 1; S.shake = .3;
+  if (audioCtx && soundOn) { // "ha-ha-ha" bursts falling in pitch
+    const t0 = audioCtx.currentTime;
+    for (let i = 0; i < 8; i++) {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), f = audioCtx.createBiquadFilter();
+      o.type = 'sawtooth'; f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 1.5;
+      const t = t0 + i * .19, base = 210 - i * 9;
+      o.frequency.setValueAtTime(base * 1.25, t); o.frequency.exponentialRampToValueAtTime(base, t + .14);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.09, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + .16);
+      o.connect(f).connect(g).connect(out()); o.start(t); o.stop(t + .18);
+    }
+  }
+  await say('Mwa-ha-ha-ha-haaa.', 55);
+  await sleep(600);
+  T.laugh = 0;
+}
+function showEnd(title, text, button) {
+  live = false; hud(false); banner(null); $('#stop').hidden = true;
+  $('#endTitle').textContent = title; $('#endText').textContent = text; $('#again').textContent = button;
+  $('#end').hidden = false;
+}
+
+async function waitUntil(test, ms) {
+  const end = performance.now() + ms;
+  while (performance.now() < end) { if (test()) return true; await sleep(80); }
+  return false;
+}
+
+// ---------- Who you are ----------
+let name = 'Nobody';
+const NAME_KEY = 'theEye.name';
+function recallName() { try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; } }
+function rememberName(n) { name = n; try { localStorage.setItem(NAME_KEY, n); } catch {} }
+function extractName(text) {
+  const t = text.replace(/[^\p{L}\p{M}' -]/gu, ' ').trim();
+  const m = t.match(/(?:my name is|my name's|i am|i'm|im|call me|it's|its|this is)\s+([\p{L}'-]+)/iu);
+  const raw = (m ? m[1] : t.split(/\s+/)[0] || '').slice(0, 20);
+  return raw ? raw[0].toUpperCase() + raw.slice(1) : '';
+}
+const cap = s => s[0].toUpperCase() + s.slice(1);
+
+// Wait for a nod ("yes"): the head dips a little and comes back. A tap anywhere counts too.
+// Measured against your resting pose, so a small natural nod works; turning your head sideways doesn't count.
+async function waitForNod(ms) {
+  let tapped = false, base = null, dippedAt = 0;
+  const tap = () => { tapped = true; };
+  addEventListener('pointerdown', tap);
+  const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+  const ok = await waitUntil(() => {
+    if (tapped) return true;
+    if (!face.present || face.blinking) return false;
+    const cur = { n: face.noseDy, p: face.pitchS, y: face.yaw };
+    if (!base) { base = { ...cur }; return false; }
+    const dn = Math.abs(cur.n - base.n), dp = Math.abs(wrap(cur.p - base.p)), dy = Math.abs(cur.y - base.y);
+    const dipped = (dn > .018 || dp > .05) && dy < .06;
+    if (!dippedAt) {
+      if (dipped) dippedAt = performance.now();
+      else { base.n = lerp(base.n, cur.n, .1); base.p = lerp(base.p, cur.p, .1); base.y = lerp(base.y, cur.y, .1); } // follow slow drift
+    } else {
+      if (dn < .009 && dp < .025) return true;                      // came back up: that's a nod
+      if (performance.now() - dippedAt > 1800) { dippedAt = 0; base = { ...cur }; } // just moved and stayed: reset
+    }
+    return false;
+  }, ms);
+  removeEventListener('pointerdown', tap);
+  return ok;
+}
+// Explain a game, then make sure they got it: nod to start. No button needed.
+// Two blinks close together: deliberate, so normal blinking doesn't set it off. A tap counts too.
+async function waitForDoubleBlink(ms) {
+  let tapped = false, n0 = face.blinks, lastAt = 0, lastN = face.blinks;
+  const tap = () => { tapped = true; };
+  addEventListener('pointerdown', tap);
+  const ok = await waitUntil(() => {
+    if (tapped) return true;
+    if (face.blinks !== lastN) { // a new blink
+      const now = performance.now();
+      lastN = face.blinks;
+      if (lastAt && now - lastAt < 900) return true;
+      lastAt = now;
+    }
+    return false;
+  }, ms);
+  removeEventListener('pointerdown', tap);
+  return ok;
+}
+async function confirmReady(title, rule, simpler) {
+  banner(title, `${rule} · blink twice when you're ready`);
+  setMood('quizzical');
+  await say('Got it? Blink twice when you\'re ready.');
+  if (await waitForDoubleBlink(10000)) { setMood('happy'); await say(pick(['Good.', 'Okay. Here we go.', 'Brave.'])); await sleep(400); return; }
+  setMood('smug');
+  await say(`Simple version: ${simpler}`);
+  await sleep(300);
+  await say('Blink twice. Quickly. Like this.');
+  blink(); await sleep(260); blink();
+  const ok = await waitForDoubleBlink(10000);
+  setMood(ok ? 'happy' : 'smug');
+  await say(ok ? 'There it is.' : 'I\'ll take that as a yes.');
+  await sleep(400);
+}
+
+// Big instruction at the top of the screen, so nobody misses what a game wants
+function banner(title, sub = '') {
+  const el = $('#banner');
+  T.offY = title ? .07 : 0; // make room under the banner
+  if (!title) { el.classList.remove('show'); return; }
+  $('#bannerTitle').textContent = title; $('#bannerSub').textContent = sub;
+  el.classList.remove('pop'); void el.offsetWidth; el.classList.add('show', 'pop');
+}
+function hud(show, label = '') {
+  $('#hud').hidden = !show;
+  $('#hudScore').textContent = label;
+}
+
+// ---------- Scene 1: it meets you ----------
+async function wake() {
+  T.open = 0; S.open = 0;
+  await sleep(900);
+  T.open = .25; await sleep(900);   // a slit
+  T.open = 0; await sleep(400);
+  T.open = 1; await sleep(1100);    // awake
+  if (camOK && !face.present) {
+    setMood('quizzical');
+    await say('Hello? Anyone? I can hear breathing.');
+    await waitForFace(5000);
+    await sleep(400);
+  }
+  blink(); await sleep(450); blink(); await sleep(900); // a couple of lazy blinks
+}
+
+async function meet() {
+  setMood('quizzical');
+  const known = recallName();
+  if (known) {
+    await say('Hold on. I know that face.');
+    await sleep(500);
+    name = known; setMood('surprised');
+    await say(`${known}?`);
+    await sleep(400);
+    setMood('delighted');
+    await say('You came back? Bold.');
+    await sleep(900);
+    return;
+  }
+  await say('Well, well, well.');
+  await sleep(600);
+  await say('What\'s with you?');
+  await sleep(800);
+  await say('Do you have a name, or do I have to guess?');
+  const r = await waitForReply(12000, 'Tell it your name. Say it or type it.');
+  if (!r.replied) {
+    blink(); await sleep(350); blink(); await sleep(300);
+    setMood('surprised');
+    await say('Wow.');
+    await sleep(700);
+    getAngry();
+    await say('Okay. That\'s rude.');
+    await sleep(600);
+    setMood('sulk');
+    await say('Fine. I\'ll call you Nobody.');
+    name = 'Nobody'; // not remembered: you never told it
+    await sleep(1000);
+    return;
+  }
+  const n = r.text ? extractName(r.text) : '';
+  if (!n) {
+    setMood('quizzical');
+    await say('That was mostly mumbling. I\'ll call you Mumbles.');
+    name = 'Mumbles';
+  } else {
+    rememberName(n);
+    setMood('smug'); blink();
+    await say(`${n}. Sounds made up. I'll allow it.`);
+    await sleep(500);
+    setMood('happy');
+    await say('I never forget a name, by the way. Or a face.');
+  }
+  await sleep(1000);
+}
+
+// ---------- Scene 2: it proves it can see you ----------
+async function proveIt() {
+  setMood('quizzical');
+  await say(`You think I'm just a picture, don't you, ${name}?`);
+  await sleep(700);
+  // blink once: it notices, and is unimpressed
+  setMood('calm');
+  banner('Blink once', 'Just one');
+  await say('I can see you. I\'ll prove it. Blink once, and watch me catch it.');
+  let n0 = face.blinks;
+  if (await waitUntil(() => face.blinks > n0, 10000)) {
+    tone(660, .1, .04); setMood('smug');
+    await say(pick(['Caught it. Wow. A blink. Groundbreaking.', 'Caught it. Your eyelids work. Congratulations.', 'Caught it. One blink. The bare minimum. Classic you.']));
+  } else {
+    setMood('quizzical');
+    await say('Nothing to catch. Are you a lizard? Fine. I\'ll assume you\'re a lizard.');
+  }
+  await sleep(600);
+
+  // blink twice, fast: it pretends not to be impressed, and fails
+  setMood('quizzical');
+  banner('Blink twice', 'Fast');
+  await say('Now blink twice. Fast. I\'ll catch both.');
+  n0 = face.blinks;
+  let firstAt = 0, fast = false;
+  const twice = await waitUntil(() => {
+    if (face.blinks > n0 && !firstAt) { firstAt = performance.now(); n0 = face.blinks; }
+    else if (firstAt && face.blinks > n0) { fast = performance.now() - firstAt < 900; return true; }
+    return false;
+  }, 10000);
+  banner(null);
+  tone(880, .1, .04);
+  if (twice && fast) { setMood('delighted'); await say(pick(['Ooh. Fast. You have very talented eyelids.', 'Twice! Show-off. I\'m genuinely impressed. Don\'t tell anyone.', 'Okay, that was smooth. Compliment. Don\'t get used to it.'])); }
+  else if (twice) { setMood('smug'); await say('That was two blinks with a nap in between. I\'ll allow it.'); }
+  else if (firstAt) { setMood('smug'); await say('That was one. I asked for two. Maths is hard, I know.'); }
+  else { setMood('sulk'); await say('Nothing. You\'re either very focused or asleep with your eyes open.'); }
+  await sleep(900);
+
+  setMood('calm');
+  await say('Now lean in. Closer.');
+  let nearSince = 0, nextBeep = 0;
+  if (await waitUntil(() => { // close, and held there for a moment
+    // like a parking sensor: beeps start as you lean in and get faster and higher the closer you come
+    const now = performance.now(), n = face.near;
+    if (face.present && n > 1.08 && now > nextBeep) {
+      const k = clamp((n - 1.08) / .25, 0, 1);
+      tone(700 + k * 500, .07, .06, 'square');
+      nextBeep = now + 420 - k * 330;
+    }
+    nearSince = n > 1.25 ? nearSince || now : 0;
+    return nearSince && now - nearSince > 400;
+  }, 9000)) {
+    alarm(); // too close: a proper alert
+    S.shake = .4; setMood('surprised');
+    await say('Whoa!');
+    await sleep(300);
+    setMood('annoyed');
+    await say('Too close. I can see up your nose.');
+  } else {
+    setMood('quizzical');
+    await say('Shy. Noted.');
+  }
+  await sleep(900);
+
+  setMood('calm');
+  await say('Last one. Look away from me.');
+  if (await waitUntil(() => face.awaySince && performance.now() - face.awaySince > 500, 8000)) {
+    await sleep(900); // it glances the same way you did
+    setMood('quizzical');
+    await say('Ooh, what\'s over there?');
+    await sleep(500);
+    await say('…Boring. Eyes back here.');
+  } else {
+    setMood('smug');
+    await say('You can\'t stop looking at me. I get it. I\'m gorgeous.');
+  }
+  await sleep(1000);
+}
+
+// ---------- Scene 3: hypnosis (or is it?) ----------
+async function hypnotise() {
+  setMood('calm');
+  await say(`Now, ${name}. The real reason I'm here.`);
+  await sleep(800);
+  setMood('evil');
+  await say('I am here to…');
+  await sleep(500);
+  setMood('calm');
+  T.hypno = 1; drone(7);
+  await say('hypnotise you.', 80);
+  await sleep(1000);
+  await say('You are getting… very… sleepy…', 100);
+  await sleep(1800);
+  T.hypno = 0; S.hypno = 0; blink(); setMood('delighted');
+  await say('Kidding! I can\'t do that.');
+  await sleep(1400);
+  setMood('quizzical');
+  S.hypno = .9; // a sneaky flicker of spiral
+  await say('…Or can I?');
+  await sleep(1400);
+}
+
+// ---------- Scene 4: staring match ----------
+async function staringMatch() {
+  setMood('happy');
+  await say(`Right, ${name}. Let's play a game.`);
+  await sleep(500);
+  setMood('smug');
+  await say('A staring game. You and me.');
+  await sleep(400);
+  banner('Staring match', 'First one to blink loses');
+  tone(330, .4, .05);
+  setMood('calm');
+  await say('It\'s simple. We stare at each other.');
+  await sleep(500);
+  setMood('smug');
+  await say('Look into my eye. First one to blink loses.');
+  await sleep(2200);
+  if (!(await waitUntil(() => face.present && !face.blinking, 8000))) {
+    banner(null); setMood('sulk');
+    await say('You left. I win by default. Typical.');
+    return;
+  }
+  await confirmReady('Staring match', 'Blink and you lose', 'stare at me. Don\'t blink. Whoever blinks first loses.');
+  setMood('calm');
+  await say('Eyes wide. Here we go.');
+  for (const c of ['3', '2', '1']) { banner(c, 'Get ready'); tone(440, .15, .05); await sleep(900); }
+  const start = performance.now();
+  const LIMIT = 90000; // the eye never blinks; after this it just declares itself the winner anyway
+  contest = { active: true, userBlinked: false, lookedAway: false, graceUntil: start + 400 };
+  T.open = 1.12; tone(880, .25, .06);
+  banner('Don\'t blink', 'Staring match · 0.0s');
+  say('Stare.');
+  let result = null;
+  const taunts = [
+    [15000, 'smug', 'I don\'t get dry eyes. You do.'],
+    [28000, 'quizzical', 'Are your eyes watering? They look like they\'re watering.'],
+    [42000, 'smug', 'I could do this all day. Literally. I\'m an eye.'],
+    [60000, 'evil', 'Your eyelids are begging you. Listen to them.'],
+  ];
+  await waitUntil(() => {
+    const now = performance.now(), t = now - start;
+    $('#bannerSub').textContent = `Staring match · ${(t / 1000).toFixed(1)}s`;
+    if (taunts.length && t > taunts[0][0]) { const [, m, line] = taunts.shift(); setMood(m); say(line); }
+    if (contest.userBlinked) result = 'blink';
+    else if (!face.present && now - face.lastSeen > 2500) result = 'gone'; // only a blink, or leaving, ends it
+    else if (t > LIMIT) result = 'statue';
+    return result;
+  }, LIMIT + 5000);
+  contest.active = false; T.open = 1;
+  const held = (performance.now() - start) / 1000;
+  banner(result === 'statue' ? 'You survived' : 'You lose', `${held.toFixed(1)} seconds`);
+  await sleep(300);
+  setTimeout(() => banner(null), 3500);
+
+  if (result === 'blink' || result === 'gone') {
+    S.flash = 1; tone(220, .25, .06, 'square');
+    const what = result === 'blink' ? 'Blink!' : 'You left.';
+    if (held < 10) {
+      setMood('annoyed');
+      await say(`${what} ${held.toFixed(1)} seconds?`);
+      await sleep(500);
+      await say(`Looks like you don't want to play, ${name}.`);
+    } else {
+      setMood('happy');
+      await say(`${what} ${held.toFixed(1)} seconds. Not bad, ${name}.`);
+      await sleep(400);
+      await say('Still lost, though.');
+    }
+  } else {
+    setMood('smug');
+    await say('Ninety seconds. You\'re basically a statue.');
+    await sleep(500);
+    await say('But I still didn\'t blink. I never blink. I win.');
+  }
+  if (result !== 'statue') { await sleep(500); setMood('evil'); await say('I don\'t blink, by the way. Ever. You never had a chance.'); }
+  await sleep(1200);
+}
+
+// ---------- Scene 5: eyes here, buddy ----------
+// Things appear at the far left or right edge, one at a time, each worth a second of reading.
+// A webcam can't see a quick flick of the eyes, but it can see you *look over and stay there*:
+// we measure your iris position + head turn against your own "looking at me" pose and its natural jitter,
+// and only count it when you look toward the side the bait is on, and hold it for about half a second.
+const lookLeftness = ref => (face.irisH - ref.h) + (face.yaw - ref.y) * .6; // + = looking toward the left of the screen
+
+async function eyesHere() {
+  setMood('happy');
+  await say('Next game.');
+  await sleep(400);
+  setMood('calm');
+  await say('Let\'s test your loyalty.');
+  await sleep(500);
+  banner('Eyes on me', 'Whatever pops up, don\'t look at it');
+  await say('Things will pop up at the sides. Don\'t look at them. Keep your eyes on me.');
+  await sleep(300);
+  await confirmReady('Eyes on me', 'Don\'t look at anything else', 'look only at me. Not at anything else.');
+  banner('Eyes on me', 'Whatever pops up, don\'t look at it');
+  await say('Look at me.');
+
+  // your "looking at me" pose, and how much it wobbles on its own
+  const vals = [], t0 = performance.now();
+  while (performance.now() - t0 < 1500) {
+    if (face.present && !face.blinking) vals.push([face.irisH, face.yaw]);
+    await sleep(30);
+  }
+  const ref = { h: vals.length ? vals.reduce((a, v) => a + v[0], 0) / vals.length : face.irisH, y: vals.length ? vals.reduce((a, v) => a + v[1], 0) / vals.length : face.yaw };
+  const jit = vals.length ? Math.sqrt(vals.reduce((a, v) => a + ((v[0] - ref.h) + (v[1] - ref.y) * .6) ** 2, 0) / vals.length) : .01;
+  const T = Math.max(.03, jit * 4); // a real look away is well beyond your normal wobble
+
+  const BAITS = [
+    { id: 'pizza', side: 1, label: 'the free pizza', run: async () => { for (const n of [3, 2, 1]) { $('#pizzaCount').textContent = `ends in ${n}`; await sleep(1000); } } },
+    { id: 'toast', side: -1, label: 'your mom\'s message', run: async () => { const t = 'Call me. It\'s urgent. It\'s about your cousin\'s wedding.'; $('#toastText').textContent = ''; for (const ch of t) { $('#toastText').textContent += ch; await sleep(55); } } },
+    { id: 'chat', side: 1, label: 'Sam\'s text', run: async () => { $('#chatText').innerHTML = '<i></i><i></i><i></i>'; await sleep(1400); $('#chatText').textContent = 'you will NOT believe what I just saw 👀'; await sleep(1800); } },
+    { id: 'battery', side: -1, label: 'your battery', run: async () => { await sleep(3200); } },
+  ];
+  const caught = [];
+  for (const b of BAITS) {
+    $('#' + b.id).hidden = false; tone(1320, .08, .03); navigator.vibrate?.(120);
+    let held = 0, last = performance.now(), got = false, done = false;
+    b.run().then(() => { done = true; });
+    const t1 = performance.now();
+    while (!done || performance.now() - t1 < 3300) {
+      const now = performance.now(), dt = now - last; last = now;
+      const toward = face.present && !face.blinking && b.side * lookLeftness(ref) > T;
+      held = toward ? held + dt : Math.max(0, held - dt);
+      if (!got && held > 450) { // looked over there and stayed
+        got = true; caught.push(b.label);
+        S.shake = .5; tone(160, .2, .06, 'square'); setMood('annoyed');
+        glance = { x: -b.side * .9, y: .3, until: now + 1200 }; // it looks where you looked
+        say(pick([`Eyes here, buddy. I saw you look at ${b.label}.`, `${cap(b.label)}? Really? I'm right here.`, 'Eyes. On. Me.']));
+        setTimeout(() => setMood('calm'), 1800);
+      }
+      await sleep(40);
+    }
+    $('#' + b.id).hidden = true;
+    await sleep(600);
+  }
+  banner(null);
+  await sleep(300);
+  if (!caught.length) {
+    setMood('delighted');
+    await say(`Not one glance. Loyal, ${name}. I'm almost touched.`);
+  } else if (caught.length === 1) {
+    setMood('quizzical');
+    await say(`One slip. ${cap(caught[0])}. I saw that.`);
+  } else {
+    setMood('annoyed');
+    await say(`You looked away ${caught.length} times. I counted. I always count.`);
+  }
+  await sleep(1200);
+}
+
+// ---------- Scene 6: a story you can't blink through ----------
+// A long, warm story, one line at a time. It's long on purpose: almost nobody gets to the end.
+// Blink and it stops, and the eye spoils the ending for you.
+const STORY = [ // [line, extra hold in ms]. The pauses stretch near the end, where it hurts most.
+  ['Once upon a time, on a rooftop above a sleepy city, there lived a grey cat called Mama.', 600],
+  ['She was nobody\'s pet. She belonged to the rooftops, and the rooftops belonged to her.', 600],
+  ['One cold morning, she found something in a cardboard box behind the bakery.', 600],
+  ['A kitten. The size of a teacup. He wasn\'t even hers.', 800],
+  ['She carried him home anyway. One careful step at a time, up six flights of fire escape.', 600],
+  ['Home was a rooftop. A chimney that stayed warm. The whole city glowing below.', 600],
+  ['She named him Little Paws, because that\'s all he was.', 800],
+  ['She taught him everything.', 400],
+  ['How to land on his feet. How to drink rain from the gutter.', 400],
+  ['How to sit very still when the pigeons came close.', 600],
+  ['And when the storms came, she taught him the most important thing.', 900],
+  ['She curled her whole body around him, wrapped her tail over his eyes, and whispered:', 700],
+  ['"I am right here."', 1400],
+  ['He believed her. Every single time.', 1000],
+  ['Seasons passed. Little Paws grew.', 600],
+  ['Then he grew bigger than her.', 800],
+  ['He caught his own dinners. He chased his own pigeons.', 500],
+  ['Some nights he didn\'t come home at all.', 1000],
+  ['Mama never said anything. She just kept his side of the chimney warm.', 1400],
+  ['One winter, Mama got slow.', 1000],
+  ['She stopped jumping to the high ledge. Her purr got very, very quiet.', 1400],
+  ['Then one night, the biggest storm of the year rolled over the city.', 1200],
+  ['Little Paws was three rooftops away when the thunder hit.', 1200],
+  ['And he ran.', 1600],
+  ['Over the gutters. Through the rain. Across the jump he\'d always been scared of.', 1400],
+  ['He found her by the chimney.', 1800],
+  ['Small. Shivering. Alone.', 2200],
+  ['He didn\'t say anything.', 2000],
+  ['He just lay down beside her, and curled his whole body around her.', 2200],
+  ['The way she once did for him.', 2600],
+  ['He wrapped his tail over her eyes.', 2600],
+  ['And he whispered…', 3000],
+  ['"I am right here."', 3200],
+  ['She purred. Just once. Very quietly.', 3000],
+  ['Because home was never the rooftop.', 2600],
+  ['It was whoever holds you through the storm.', 3600],
+];
+
+// You blinked: the story cracks like glass, flashes, and the words fall away.
+function breakStory() {
+  const el = $('#story');
+  if (el.classList.contains('broken')) return;
+  $('#cracks').style.transform = `rotate(${Math.random() * 360}deg)`;
+  el.classList.add('broken');
+  navigator.vibrate?.(180);
+  if (audioCtx && soundOn) { // a glassy crack: a sharp noise burst plus a ping
+    const t = audioCtx.currentTime, len = audioCtx.sampleRate * .35, b = audioCtx.createBuffer(1, len, audioCtx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+    const src = audioCtx.createBufferSource(); src.buffer = b;
+    const hp = audioCtx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500;
+    const g = audioCtx.createGain(); g.gain.value = .5;
+    src.connect(hp).connect(g).connect(out()); src.start(t);
+    tone(2400, .3, .05, 'sine'); tone(150, .4, .08, 'square');
+  }
+}
+
+// Tells the story until you blink. Resolves { line, secs }; line === STORY.length means you made it.
+async function tellStory() {
+  const prev = $('#storyPrev'), txt = $('#storyText');
+  prev.textContent = ''; txt.textContent = ''; txt.classList.remove('show');
+  $('#story').hidden = false;
+  const start = performance.now();
+  Object.assign(storyWatch, { active: true, blinked: false, gone: false, graceUntil: start + 1500 }); // a moment to settle
+  const tick = setInterval(() => {
+    const t = Math.floor((performance.now() - start) / 1000);
+    $('#storyClock').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')} without blinking`;
+    if (camOK && !face.present && performance.now() - face.lastSeen > 1200) {
+      Object.assign(storyWatch, { blinked: true, gone: true }); breakStory();
+    }
+  }, 100);
+  let line = 0;
+  for (; line < STORY.length && !storyWatch.blinked; line++) {
+    const [text, hold] = STORY[line];
+    txt.classList.remove('show');
+    if (await waitUntil(() => storyWatch.blinked, 450)) break;
+    prev.textContent = line ? STORY[line - 1][0] : '';
+    txt.textContent = text; txt.classList.add('show');
+    // time to read it, plus the pause
+    if (await waitUntil(() => storyWatch.blinked, 1400 + text.length * 48 + hold)) break;
+  }
+  clearInterval(tick);
+  const made = !storyWatch.blinked;
+  storyWatch.active = false;
+  if (!made) await sleep(1300); // let the crack play out
+  $('#story').hidden = true; $('#story').classList.remove('broken');
+  return { line: made ? STORY.length : line, secs: Math.round((performance.now() - start) / 1000) };
+}
+
+async function dontBlinkStory() {
+  setMood('happy');
+  await say('Let me tell you a story.');
+  await sleep(500);
+  await say('It\'s about a mama cat and her little kitten. It\'s beautiful. I cry every time.');
+  await sleep(700);
+  setMood('smug');
+  await say('But if you blink, the story stops.');
+  await sleep(600);
+  setMood('quizzical');
+  await say('So… don\'t blink.');
+  await sleep(900);
+  await confirmReady('Don\'t blink', 'The story stops when you blink', 'read the story. If you blink, it\'s gone.');
+  banner(null);
+  await say('Blink now. Get it out of your system.');
+  await sleep(2200);
+
+  const r = await tellStory();
+  if (r.line === STORY.length) {
+    setMood('surprised');
+    await say(`${name}. You didn't blink. The whole story. ${r.secs} seconds.`);
+    await sleep(800);
+    setMood('sad');
+    await say('That\'s… not a tear. I don\'t have tears. It\'s rain. From the story.');
+    await sleep(1000);
+    setMood('smug');
+    await say('Tell anyone and I\'ll deny it.');
+    await sleep(1400);
+    return;
+  }
+
+  // you blinked: the story is gone, the eye is back, and it ruins the ending for you
+  S.flash = 1; S.shake = .6; tone(160, .25, .06, 'square');
+  setMood('angry');
+  await say(storyWatch.gone ? 'Where did you go? That counts as a blink.' : 'I told you not to blink.');
+  await sleep(700);
+  setMood('smug');
+  const left = STORY.length - r.line;
+  await say(left <= 8 ? `${r.secs} seconds. You were ${left} lines from the end. The BEST part.` : `${r.secs} seconds. You didn't even get to the good part.`);
+  await sleep(800);
+  setMood('smug');
+  await say('Fine. Here\'s the rest. The short version.');
+  await sleep(700);
+  setMood('sad');
+  // the gist, picking up from the part you blinked in. [starts at story line index, what happened]
+  const GIST = [
+    [0, 'Mama carried the kitten home, named him Little Paws, and taught him everything.'],
+    [7, 'In every storm she curled around him and whispered, "I am right here."'],
+    [14, 'He grew up. Bigger than her. Some nights he didn\'t even come home.'],
+    [19, 'Then Mama got old. And the biggest storm of the year hit.'],
+    [21, 'Little Paws ran all the way home, across the jump he was always scared of.'],
+    [25, 'He curled around her, just like she used to curl around him, and whispered, "I am right here."'],
+    [33, 'Because home is whoever holds you through the storm.'],
+  ];
+  let from = 0; GIST.forEach(([at], i) => { if (r.line >= at) from = i; });
+  for (const [, gist] of GIST.slice(from)) { await say(gist, 38); await sleep(900); }
+  setMood('sulk');
+  await say('You would have cried. You blinked instead.');
+  await sleep(1600);
+}
+
+// ---------- Camera setup: get into position, then let it learn your blinks ----------
+// Glasses? A frame across the bridge of your nose makes a sharp line there; bare skin doesn't.
+// Compares edge strength on the nose bridge with the cheek. Returns the ratio (about 1 without glasses), or 0.
+const gCv = document.createElement('canvas'); gCv.width = 24; gCv.height = 16;
+const gG = gCv.getContext('2d', { willReadFrequently: true });
+function glassesScore() {
+  const lm = face.lm, vw = video.videoWidth, vh = video.videoHeight;
+  if (!lm || !vw) return 0;
+  const span = Math.hypot((lm[362].x - lm[133].x) * vw, (lm[362].y - lm[133].y) * vh);
+  const edges = (p, w, h) => {
+    gG.drawImage(video, p.x * vw - w / 2, p.y * vh - h / 2, w, h, 0, 0, 24, 16);
+    const d = gG.getImageData(0, 0, 24, 16).data; let e = 0, l = 0;
+    for (let y = 1; y < 16; y++) for (let x = 0; x < 24; x++) {
+      const i = (y * 24 + x) * 4, j = i - 96;
+      const a = d[i] + d[i + 1] + d[i + 2], b = d[j] + d[j + 1] + d[j + 2];
+      e += Math.abs(a - b); l += a;
+    }
+    return e / (l + 1);
+  };
+  const bridge = edges(lm[6], span * .55, span * .45), cheek = (edges(lm[50], span * .55, span * .45) + edges(lm[280], span * .55, span * .45)) / 2;
+  return cheek > 0 ? bridge / Math.max(cheek, .004) : 0;
+}
+
+function setupCamera() {
+  const el = $('#setup'), cam = $('#setupCam'), g = cam.getContext('2d');
+  const probe = document.createElement('canvas'); probe.width = 16; probe.height = 12;
+  const pg = probe.getContext('2d', { willReadFrequently: true });
+  const setCk = (id, ok) => $(id).classList.toggle('ok', ok);
+  let last = '';
+  const tell = t => { if (t !== last) $('#setupSay').textContent = last = t; };
+  el.hidden = false;
+
+  return new Promise(resolve => {
+    const start = performance.now();
+    let skipped = false, luma = 128, frameN = 0, okSince = 0, step = 'frame';
+    let cal = null;
+    $('#setupSkip').onclick = () => { skipped = true; };
+
+    // blink lessons happen on the eye itself: its pupil, dead centre, is the thing to look at
+    const lesson = on => {
+      el.classList.toggle('lesson', on);
+      glance = on ? { x: 0, y: 0, until: Infinity } : null;
+      if (on) { T.open = 1; T.offX = T.offY = 0; T.scale = 1; setMood('calm'); }
+    };
+    const finish = async (msg) => {
+      tell(msg); await sleep(1300);
+      lesson(false); T.open = 0;
+      el.hidden = true; resolve();
+    };
+
+    const loop = () => {
+      if (skipped) { lesson(false); el.hidden = true; resolve(); return; }
+      const now = performance.now(), W2 = cam.width, H2 = cam.height;
+      // mirrored camera, cropped to fill
+      const vw = video.videoWidth || 640, vh = video.videoHeight || 480, sc = Math.max(W2 / vw, H2 / vh);
+      g.save(); g.translate(W2, 0); g.scale(-1, 1);
+      g.drawImage(video, (W2 - vw * sc) / 2, (H2 - vh * sc) / 2, vw * sc, vh * sc);
+      g.restore();
+      if (++frameN % 15 === 0) { // how bright is it?
+        pg.drawImage(video, 0, 0, 16, 12);
+        const d = pg.getImageData(0, 0, 16, 12).data; let sum = 0;
+        for (let i = 0; i < d.length; i += 4) sum += d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11;
+        luma = sum / (d.length / 4);
+      }
+
+      const faceOk = face.present && Math.abs(face.x - .5) < .17 && Math.abs(face.y - .47) < .2;
+      const tooFar = face.present && face.size < .18, tooClose = face.present && face.size > .62;
+      const distOk = face.present && !tooFar && !tooClose;
+      const levelOk = face.present && Math.abs(face.pitch) < .35;
+      const lightOk = luma > 50;
+      setCk('#ckFace', faceOk); setCk('#ckDist', distOk); setCk('#ckLevel', levelOk); setCk('#ckLight', lightOk);
+      const ready = faceOk && distOk && lightOk && (levelOk || now - start > 6000); // "more or less there" is fine
+
+      // oval guide with a dimmed surround
+      g.fillStyle = 'rgba(5,4,7,.55)'; g.beginPath(); g.rect(0, 0, W2, H2);
+      g.ellipse(W2 / 2, H2 * .47, W2 * .32, H2 * .33, 0, 0, Math.PI * 2); g.fill('evenodd');
+      g.lineWidth = 3; g.strokeStyle = ready ? '#6fc3b8' : 'rgba(239,230,216,.6)';
+      g.beginPath(); g.ellipse(W2 / 2, H2 * .47, W2 * .32, H2 * .33, 0, 0, Math.PI * 2); g.stroke();
+
+      if (step === 'frame') {
+        if (now - start < 2800) tell('Rest your phone on something. Then let me look at you.');
+        else if (!face.present) tell('I can\'t see you. Put your face in the oval.');
+        else if (!faceOk) tell('Into the oval. It\'s not a suggestion.');
+        else if (tooFar) tell('Closer. I don\'t bite. Much.');
+        else if (tooClose) tell('Too close. Back up a little.');
+        else if (!lightOk) tell('It\'s dark in there. Find a lamp.');
+        else if (!levelOk && now - start < 6000) tell('Hold it at eye level. I\'m not a ceiling.');
+        else tell('Perfect. Hold it right there.');
+        okSince = ready ? okSince || now : 0;
+        if ((okSince && now - okSince > 1200) || (now - start > 25000 && face.present)) {
+          step = 'still'; cal = { t: now, ears: [], bls: [], glass: [] }; lesson(true);
+          tell(now - start > 25000 && !okSince ? 'Close enough. Now look into my pupil. Eyes open. Don\'t blink yet.' : 'Now look into my pupil. Eyes open. Don\'t blink yet.');
+        }
+      } else if (step === 'still' && face.present) {
+        // 1. your open eyes, and how much the readings wobble on this camera
+        cal.ears.push(face.ear); cal.bls.push(face.bl);
+        if (frameN % 6 === 0) { const gs = glassesScore(); if (gs) cal.glass.push(gs); }
+        if (now - cal.t > 1600 && cal.ears.length > 12) {
+          const mid = a => [...a].sort((x, y) => x - y)[a.length >> 1];
+          const spread = (a, m) => mid(a.map(v => Math.abs(v - m))) * 1.48 || .001; // robust: a stray blink doesn't spoil it
+          cal.ear = mid(cal.ears); cal.earSd = Math.max(spread(cal.ears, cal.ear), cal.ear * .015);
+          cal.bl = mid(cal.bls); cal.blSd = Math.max(spread(cal.bls, cal.bl), .01);
+          cal.glasses = cal.glass.length >= 3 && mid(cal.glass) > 2.2;
+          base.ear = cal.ear; base.bl = cal.bl;
+          step = 'blink'; cal.t = now; cal.blinks = []; cal.cur = null;
+          tell(cal.glasses ? 'Glasses. Fancy. Keep looking at my pupil and blink three times. Slowly.' : 'Keep looking at my pupil. Blink three times. Slowly.');
+        }
+      } else if (step === 'blink' && face.present) {
+        // 2. three slow blinks, watched loosely: how far do YOUR eyes close, as this camera sees them?
+        const shut = face.ear < cal.ear - Math.max(cal.earSd * 4, cal.ear * .12) || face.bl > cal.bl + Math.max(cal.blSd * 4, .15);
+        if (shut) {
+          if (!cal.cur) cal.cur = { minEar: 1, maxBl: 0 };
+          cal.cur.minEar = Math.min(cal.cur.minEar, face.ear); cal.cur.maxBl = Math.max(cal.cur.maxBl, face.bl);
+        } else if (cal.cur) {
+          cal.blinks.push(cal.cur); cal.cur = null;
+          tell(['One.', 'Two.', 'Three. Lovely.'][Math.min(2, cal.blinks.length - 1)]);
+        }
+        if (cal.blinks.length >= 3 || now - cal.t > 10000) {
+          if (!cal.blinks.length) { step = 'done'; finish('No blinks? Fine. I\'ll use my best guess.'); return; }
+          // trigger partway between your open and closed eyes, but never inside this camera's wobble
+          const avg = k => cal.blinks.reduce((a, b) => a + b[k], 0) / cal.blinks.length;
+          const depth = cal.ear - avg('minEar'), rise = avg('maxBl') - cal.bl, soft = cal.glasses ? .8 : 1;
+          const earGap = clamp(Math.max(depth * .5 * soft, cal.earSd * 3), 0, depth * .85);
+          calib.earRatio = clamp((cal.ear - earGap) / cal.ear, .55, .92);
+          calib.bl = rise > .1 ? clamp(cal.bl + Math.max(rise * .45 * soft, cal.blSd * 3 + .05), .15, .65) : .9; // blink score useless here (often with glasses): go by eyelids
+          calib.done = true;
+          step = 'verify'; cal.t = now; cal.n0 = face.blinks; cal.tries = (cal.tries || 0);
+          tell('Still on my pupil. Two quick blinks. I\'ll blink back if I catch them.');
+        }
+      } else if (step === 'verify') {
+        // 3. test it with the real blink detector; if it misses, loosen up and try again
+        const got = face.blinks - cal.n0;
+        setCk('#ckBlink', got >= 2);
+        if (got >= 2) { step = 'done'; finish(cal.glasses ? 'Caught both. Through the glasses, even. Show-off.' : 'Caught both. I know exactly what your blinks look like now.'); return; }
+        if (now - cal.t > 6000) {
+          calib.earRatio = Math.min(.92, calib.earRatio + .06);
+          calib.bl = calib.bl > .8 ? calib.bl : Math.max(cal.bl + cal.blSd * 2 + .04, calib.bl - .1);
+          if (++cal.tries >= 2) { step = 'done'; finish('Close enough. I\'ll watch harder.'); return; }
+          cal.t = now; cal.n0 = face.blinks;
+          tell(got ? 'Only caught one. Again. Two quick blinks.' : 'Missed those. I\'ve adjusted. Two quick blinks again.');
+        }
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  });
+}
+
+// ---------- Scene: the fly goes where you look ----------
+// First you teach it: look at five dots. Then a crosshair sits where you're looking, and the fly chases it.
+const arena = $('#arena'), actx = arena.getContext('2d');
+function sizeArena() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  arena.width = W * dpr; arena.height = H * dpr; actx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function drawFlyBug(g, x, y, ang, u, now, alpha = 1) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.globalAlpha = alpha;
+  const flap = .35 + .65 * Math.abs(Math.sin(now / 18));
+  g.fillStyle = 'rgba(220,230,255,.8)';
+  for (const s of [-1, 1]) { g.beginPath(); g.ellipse(-u * 2, s * u * 7 * flap, u * 9, u * 4.5 * flap, s * .5, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = '#2b2430'; g.strokeStyle = 'rgba(239,230,216,.8)'; g.lineWidth = 1.2;
+  g.beginPath(); g.ellipse(0, 0, u * 10, u * 6.5, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.fillStyle = '#b3262e'; // big red fly eyes
+  for (const s of [-1, 1]) { g.beginPath(); g.arc(u * 8, s * u * 3.5, u * 3.2, 0, Math.PI * 2); g.fill(); }
+  g.restore();
+}
+
+// Gaze model. Features: iris position (the real signal) plus head turn, head nod and head position.
+// We show 9 dots, record your features at each, and fit screen x and y with least squares.
+const gz = { wx: null, wy: null, bx: 0, by: 0 }; // bx/by: drift correction, learned while you play
+const featX = () => [1, face.irisH, face.yaw];
+const featY = () => [1, face.irisV, face.noseDy];
+function solve(A, b) { // tiny Gaussian elimination, A is n×n
+  const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    if (Math.abs(M[c][c]) < 1e-12) return null;
+    for (let r = 0; r < n; r++) if (r !== c) { const k = M[r][c] / M[c][c]; for (let j = c; j <= n; j++) M[r][j] -= k * M[c][j]; }
+  }
+  return M.map((r, i) => r[n] / r[i]);
+}
+function fitLinear(rows, ys) { // ridge-regularised least squares, features standardised so none dominates
+  const k = rows[0].length, mean = Array(k).fill(0), sd = Array(k).fill(1);
+  for (let j = 1; j < k; j++) {
+    mean[j] = rows.reduce((a, r) => a + r[j], 0) / rows.length;
+    sd[j] = Math.sqrt(rows.reduce((a, r) => a + (r[j] - mean[j]) ** 2, 0) / rows.length) || 1;
+  }
+  const Z = rows.map(r => r.map((v, j) => j ? (v - mean[j]) / sd[j] : 1));
+  const A = Array.from({ length: k }, (_, i) => Array.from({ length: k }, (_, j) => Z.reduce((a, r) => a + r[i] * r[j], 0) + (i === j && i ? .05 * rows.length : 0)));
+  const bb = Array.from({ length: k }, (_, i) => Z.reduce((a, r, n) => a + r[i] * ys[n], 0));
+  const w = solve(A, bb);
+  return w && { w, mean, sd };
+}
+const applyFit = (m, f) => m.w.reduce((a, wi, j) => a + wi * (j ? (f[j] - m.mean[j]) / m.sd[j] : 1), 0);
+// keep estimates on screen without pinning them to an edge (a hard clamp is what made the fly "stick" at the top)
+const soft = (v, mid, half) => mid + half * Math.tanh((v - mid) / half);
+function gazePoint() {
+  if (gz.wx && gz.wy) return { x: soft(applyFit(gz.wx, featX()) + gz.bx, W / 2, W * .5), y: soft(applyFit(gz.wy, featY()) + gz.by, H / 2, H * .5) };
+  // no fit: point with your head instead (still follows you, never freezes)
+  return { x: W / 2 - (face.fx - .5) * W * 3 - face.yaw * W * 1.6, y: H / 2 + (face.fy - .45) * H * 3 + (face.noseDy - .35) * H * 2 };
+}
+
+async function flyFollow() {
+  setMood('happy');
+  await say('Next game.');
+  await sleep(400);
+  setMood('smug');
+  await say('Remember the fly? I trained it.');
+  await sleep(500);
+  await say('It goes wherever you look.');
+  await sleep(400);
+  sizeArena(); arena.hidden = false;
+  const u = clamp(Math.min(W, H) / 420, .8, 1.6), U = u * 1.6;
+  const fly = { x: W / 2, y: H * .85, vx: 0, vy: 0 }, aim = { x: W / 2, y: H / 2 };
+  let mode = 'teach', dot = null, cube = null, got = 0, buzz = 0, running = true, last = performance.now(), sparks = [];
+  const frame = now => {
+    if (!running) return;
+    const f = Math.min(3, (now - last) / 16.7); last = now;
+    if (W * Math.min(devicePixelRatio || 1, 2) !== arena.width) sizeArena();
+    const g = actx; g.clearRect(0, 0, W, H);
+    // calibration dot
+    if (dot) {
+      const pr = 1 + .35 * Math.sin(now / 160);
+      g.fillStyle = 'rgba(111,195,184,.18)'; g.beginPath(); g.arc(dot.x, dot.y, 26 * u * pr, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#6fc3b8'; g.shadowColor = '#6fc3b8'; g.shadowBlur = 16;
+      g.beginPath(); g.arc(dot.x, dot.y, 9 * u, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0;
+    }
+    if (mode === 'play' || mode === 'practice') {
+      // where you're looking: a soft crosshair
+      let t = aim;
+      if (face.present && !face.blinking) t = gazePoint();
+      else if (!camOK && pointer) t = pointer;
+      if (cube && camOK) {
+        // aim assist: once you're roughly looking at the sugar, the crosshair is drawn the rest of the way.
+        // And if you've been looking at it for a while, quietly correct our drift toward it.
+        const dx = cube.x - t.x, dy = cube.y - t.y, dist = Math.hypot(dx, dy), reach = Math.hypot(W, H) * .32;
+        const pull = clamp(1 - dist / reach, 0, 1) * .6;
+        t = { x: t.x + dx * pull, y: t.y + dy * pull };
+        if (now - cube.at > 900 && dist < reach * 1.4) { gz.bx += dx * .004 * f; gz.by += dy * .004 * f; }
+      }
+      aim.x = lerp(aim.x, clamp(t.x, 20, W - 20), .1 * f); aim.y = lerp(aim.y, clamp(t.y, 20, H - 20), .1 * f); // smooth out the jitter
+      g.strokeStyle = 'rgba(111,195,184,.7)'; g.lineWidth = 2;
+      g.beginPath(); g.arc(aim.x, aim.y, 22 * u, 0, Math.PI * 2); g.stroke();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { g.beginPath(); g.moveTo(aim.x + dx * 12 * u, aim.y + dy * 12 * u); g.lineTo(aim.x + dx * 30 * u, aim.y + dy * 30 * u); g.stroke(); }
+      // the fly chases it
+      const dx = aim.x - fly.x, dy = aim.y - fly.y, d = Math.hypot(dx, dy) || 1;
+      const sp = Math.min(d * .08, 9 * u);
+      fly.vx = lerp(fly.vx, dx / d * sp, .2 * f); fly.vy = lerp(fly.vy, dy / d * sp, .2 * f);
+      fly.x += fly.vx * f + Math.sin(now / 60) * u * .8; fly.y += fly.vy * f + Math.cos(now / 75) * u * .8;
+      glance = { x: clamp((fly.x - W / 2) / (W * .45), -1, 1), y: clamp((fly.y - H * .4) / (H * .45), -1, 1), until: now + 200 };
+      if (now > buzz) { tone(190 + Math.random() * 40, .14, .01, 'sawtooth'); buzz = now + 240; }
+    }
+    // sugar cube
+    if (cube) {
+      const bob = Math.sin(now / 300) * 4 * u, s = 18 * u;
+      g.save(); g.translate(cube.x, cube.y + bob); g.rotate(.2);
+      g.fillStyle = 'rgba(255,240,200,.25)'; g.beginPath(); g.arc(0, 0, s * 2.2, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fbf6ec'; g.strokeStyle = '#d9cdb8'; g.lineWidth = 1.5;
+      g.beginPath(); g.roundRect(-s, -s, s * 2, s * 2, s * .3); g.fill(); g.stroke();
+      g.fillStyle = '#e8dcc6'; g.beginPath(); g.roundRect(-s * .55, -s * .55, s * .5, s * .5, 3); g.fill();
+      g.restore();
+      if (Math.hypot(fly.x - cube.x, fly.y - cube.y) < 48 * u) {
+        got++; cube.done = true;
+        for (let i = 0; i < 10; i++) sparks.push({ x: cube.x, y: cube.y, vx: (Math.random() - .5) * 6, vy: (Math.random() - .5) * 6, life: 1 });
+        cube = null; tone(880, .12, .05); setTimeout(() => tone(1320, .18, .05), 90);
+      }
+    }
+    for (const s of sparks) { s.x += s.vx * f; s.y += s.vy * f; s.life -= .03 * f; g.fillStyle = `rgba(255,236,180,${Math.max(0, s.life)})`; g.beginPath(); g.arc(s.x, s.y, 3 * u, 0, Math.PI * 2); g.fill(); }
+    sparks = sparks.filter(s => s.life > 0);
+    if (mode !== 'teach' || dot) drawFlyBug(g, fly.x, fly.y, Math.atan2(fly.vy, fly.vx || .001), U, now, mode === 'teach' ? 0 : 1);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  // 1. teach it: look at nine dots, then fit what your eyes do to where the dots were
+  if (camOK && landmarker) {
+    banner('Teach the fly', 'Look straight at each dot');
+    setMood('calm');
+    await say('First, teach it your eyes. Look at each dot as it appears.');
+    const rowsX = [], rowsY = [], xs = [], ys = [];
+    const grid = [[.5, .5], [.12, .18], [.5, .18], [.88, .18], [.88, .5], [.88, .84], [.5, .84], [.12, .84], [.12, .5]];
+    for (const [i, [gx, gy]] of grid.entries()) {
+      dot = { x: W * gx, y: H * gy }; tone(660, .1, .04);
+      $('#bannerSub').textContent = `Look straight at the dot · ${i + 1} of ${grid.length}`;
+      await sleep(750); // eyes travel there
+      const t0 = performance.now();
+      while (performance.now() - t0 < 750) {
+        if (face.present && !face.blinking) { rowsX.push(featX()); rowsY.push(featY()); xs.push(dot.x); ys.push(dot.y); }
+        await sleep(30);
+      }
+    }
+    dot = null;
+    if (rowsX.length > 30) { gz.wx = fitLinear(rowsX, xs); gz.wy = fitLinear(rowsY, ys); }
+  }
+
+  // 2. practice: look around, watch it follow. This is the "did you get it" moment.
+  mode = 'practice'; fly.x = W / 2; fly.y = H * .85;
+  banner('Look around', camOK ? 'The fly goes where you look' : 'The fly follows your mouse or finger');
+  setMood('delighted');
+  await say('Now look around. Slowly.');
+  await sleep(3500);
+  setMood('smug');
+  await say('Spooky, right? It\'s following your eyes.');
+  await sleep(1200);
+
+  // 3. the game: lead the fly to five sugar cubes
+  const spots = [[.2, .25], [.8, .75], [.8, .25], [.2, .75], [.5, .85]];
+  banner('Feed the fly', 'Look at the sugar cube. The fly follows your eyes.');
+  setMood('happy');
+  await say('It\'s hungry. Look at the sugar. Lead it there.');
+  mode = 'play';
+  for (const [i, [sx, sy]] of spots.entries()) {
+    cube = { x: W * sx, y: H * sy, at: performance.now() };
+    $('#bannerSub').textContent = `Sugar ${i + 1} of ${spots.length} · look at it`;
+    const reached = await waitUntil(() => !cube, 12000);
+    if (!reached) { cube = null; aside(pick(['Too slow. It ate a crumb instead.', 'The fly gave up on that one.']), 1600); }
+    else aside(pick(['Yum.', 'Good fly.', 'Got it.', 'Sugar rush.']), 1200);
+    await sleep(700);
+  }
+  mode = 'done'; banner(`${got} of ${spots.length}`, 'Sugar cubes eaten');
+  await sleep(400);
+  setMood(got >= 4 ? 'delighted' : got >= 2 ? 'smug' : 'sulk');
+  await say(got >= 4 ? `${got} out of ${spots.length}. You and that fly have a connection. It\'s weird.` : got >= 2 ? `${got} out of ${spots.length}. The fly is… mostly full.` : 'The fly is starving. Your eyes wander too much.');
+  await sleep(1400);
+  running = false; arena.hidden = true; actx.clearRect(0, 0, W, H); glance = null; banner(null);
+  await sleep(500);
+}
+
+// ---------- Scene: read your face ----------
+// It asks for three faces, watches what your face actually does, and tells you what it really saw.
+async function readFace() {
+  setMood('quizzical');
+  await say('Let me read your face.');
+  await sleep(400);
+  banner('Read your face', 'Do what it asks');
+  setMood('calm');
+  await say('First, a normal face. Boring. Like at the bank.');
+  const acc = {}; let n = 0; const t0 = performance.now(); // your resting face, so we measure *your* expressions
+  while (performance.now() - t0 < 1500) {
+    if (face.present && !face.blinking) { n++; for (const k in face.ex) acc[k] = (acc[k] || 0) + face.ex[k]; }
+    await sleep(40);
+  }
+  exBase = {}; for (const k in acc) exBase[k] = acc[k] / Math.max(1, n);
+
+  // how strongly your face is doing each kind of expression right now
+  const reads = () => { const d = exDelta(); return { happy: d.smile, surprised: Math.max(d.jaw * .8 + d.browUp * .6, d.jaw), angry: d.browDown * 1.3 + d.squint * .3 }; };
+  const NAMES = { happy: 'a smile', surprised: 'surprised', angry: 'angry' };
+  const ASKS = [
+    { want: 'happy', title: 'Happiest face', line: 'Show me your happiest face.', mood: 'delighted',
+      big: ['That\'s a lot of happy. Calm down.', 'Wow. Big smile. Suspiciously big. What did you do?'],
+      bigTeeth: ['Wow. Teeth. All of them. Terrifying.', 'That\'s a lot of teeth. Are you happy or hungry?'],
+      bigClosed: ['A big smile with your mouth shut. Hiding something? Spinach?', 'Lips sealed, cheeks working overtime. Mysterious.'],
+      small: ['That\'s your happy face? It looks like a hostage photo.', 'Happy. Allegedly.'] },
+    { want: 'surprised', title: 'Surprised face', line: 'Now look surprised. REALLY surprised.', mood: 'surprised',
+      big: ['Good. You look like your mum just found your search history.', 'Perfect. That\'s the face of someone who just realised I\'m real.', 'Excellent. Very dramatic. Oscar-adjacent.'],
+      small: ['That\'s surprised? You look mildly inconvenienced.', 'I\'ve seen more surprise from a potato.'] },
+    { want: 'angry', title: 'Angriest face', line: 'Now your angriest face. Go on. Scare me.', mood: 'angry',
+      big: ['Ooh. I felt that. Barely. But I felt it.', 'Okay, okay. Put the eyebrows down.'],
+      small: ['That\'s angry? I\'ve seen angrier toast.', 'Angry like someone took the last biscuit. Mild.'] },
+  ];
+  for (const [i, a] of ASKS.entries()) {
+    banner(a.title, `${i + 1} of ${ASKS.length} · do it now`);
+    setMood('calm');
+    await say(a.line);
+    // watch for 3 seconds and keep the strongest moment of each expression
+    const peak = { happy: 0, surprised: 0, angry: 0 }, t1 = performance.now();
+    let smileJaw = 0, bestSmile = 0; // how open the mouth was at the biggest smile: open = teeth showing
+    const stopMirror = startMirror(); // it pulls the same face as you while it watches
+    while (performance.now() - t1 < 3000) {
+      if (face.present) {
+        const r = reads(); for (const k in peak) peak[k] = Math.max(peak[k], r[k]);
+        if (r.happy > bestSmile) { bestSmile = r.happy; smileJaw = Math.max(0, (face.ex.jaw || 0) - (exBase.jaw || 0)); }
+      }
+      await sleep(40);
+    }
+    stopMirror();
+    tone(660, .1, .04);
+    const top = Object.keys(peak).reduce((x, y) => peak[y] > peak[x] ? y : x);
+    let line;
+    if (!face.present && !peak[a.want]) line = 'I couldn\'t even see you. Bold strategy.';
+    else if (peak[a.want] < .15 && peak[top] < .15) line = 'Nothing moved. Is your face… on?';
+    else if (top !== a.want && peak[top] > peak[a.want] * 1.4 && peak[top] > .25) line = `I asked for ${NAMES[a.want]}. That was ${NAMES[top]}. Are you okay?`;
+    else if (peak[a.want] > .45 && a.bigTeeth) line = pick(smileJaw > .1 ? a.bigTeeth : a.bigClosed);
+    else line = pick(peak[a.want] > .45 ? a.big : a.small);
+    setMood(a.mood); // it pulls the face back at you
+    await say(line);
+    await sleep(900);
+  }
+  // finale: the most ridiculous face, held for a photo
+  banner('Most ridiculous face', 'Go big. Hold it for the photo');
+  setMood('evil');
+  await say('Last one. Your most ridiculous face. Go.');
+  let wild = 0; const t2 = performance.now();
+  const howWild = () => { const d = exDelta(); return d.smile + d.jaw + d.browUp + d.browDown + d.pucker + d.squint + d.wink + d.browOne; };
+  const stopMirror2 = startMirror(1.8);
+  while (performance.now() - t2 < 1200) { if (face.present) wild = Math.max(wild, howWild()); await sleep(40); }
+  banner('Hold it…', '');
+  await say('Hold it…', 30);
+  banner('Hold it…', 'hold it…');
+  await say('Hold it…', 30);
+  for (const c of ['3', '2', '1']) { $('#bannerSub').textContent = c; tone(520, .08, .04); if (face.present) wild = Math.max(wild, howWild()); await sleep(450); }
+  if (face.present) wild = Math.max(wild, howWild());
+  const pic = takeSnapshot();
+  stopMirror2();
+  banner(null);
+  if (pic) {
+    $('#snapImg').src = pic;
+    const big = wild > 1.1;
+    $('#snapCap').textContent = big ? 'Exhibit A. Too much.' : 'Exhibit A. That\'s just your face.';
+    $('#snap').hidden = false;
+    setMood(big ? 'delighted' : 'smug');
+    await say(big ? 'Look at that. That\'s too much. Put it away.' : 'That\'s your ridiculous face? That\'s just your face.');
+    await sleep(900);
+    await say(big ? 'I\'m keeping this one. Forever. In my heart. Not online, relax.' : 'See how ridiculous you look? Every day, apparently.');
+    await sleep(1600);
+    $('#snap').hidden = true; $('#snapImg').removeAttribute('src');
+  } else {
+    setMood('smug');
+    await say('My camera blinked. Lucky you.');
+  }
+  setMood('smug');
+  await say('Four faces. I\'ll remember all of them. Especially that last one.');
+  await sleep(1000);
+}
+
+// A photo of you, straight from the camera, mirrored like a selfie. It only ever lives on this screen: never saved, never sent.
+function takeSnapshot() {
+  if (!camOK || !video.videoWidth) return null;
+  const c = document.createElement('canvas'), w = video.videoWidth, h = video.videoHeight, side = Math.min(w, h);
+  c.width = c.height = 480;
+  const g = c.getContext('2d');
+  g.translate(480, 0); g.scale(-1, 1);
+  g.drawImage(video, (w - side) / 2, (h - side) / 2, side, side, 0, 0, 480, 480);
+  // shutter: a white flash and a click
+  const fl = $('#flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+  if (audioCtx && soundOn) {
+    const t = audioCtx.currentTime, len = audioCtx.sampleRate * .08, b = audioCtx.createBuffer(1, len, audioCtx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = audioCtx.createBufferSource(); src.buffer = b; const gn = audioCtx.createGain(); gn.gain.value = .6;
+    src.connect(gn).connect(out()); src.start(t); tone(1800, .05, .04, 'square');
+  }
+  return c.toDataURL('image/jpeg', .85);
+}
+
+// ---------- Scene: snake, "no!" ----------
+// The snake goes for whatever treat appears. Berry: let it eat. Chili: shake your head "no" before it gets there.
+// A head shake is one of the sturdiest things a camera can see: the head swings left-right-left, fast and wide,
+// so we don't need to know where your eyes point at all.
+
+// Shake detector: within the last second, your head turned both ways by a clear amount, changing direction at least twice.
+function makeShakeDetector() {
+  const hist = [];
+  return () => {
+    const now = performance.now();
+    if (face.present) hist.push({ t: now, y: face.yaw });
+    while (hist.length && now - hist[0].t > 1000) hist.shift();
+    if (hist.length < 6) return false;
+    let lo = Infinity, hi = -Infinity, flips = 0, dir = 0;
+    for (let i = 0; i < hist.length; i++) {
+      lo = Math.min(lo, hist[i].y); hi = Math.max(hi, hist[i].y);
+      if (i) { const d = hist[i].y - hist[i - 1].y; if (Math.abs(d) > .006) { const s = Math.sign(d); if (dir && s !== dir) flips++; dir = s; } }
+    }
+    if (hi - lo > .08 && flips >= 2) { hist.length = 0; return true; }
+    return false;
+  };
+}
+
+// A green chili: a curved pod that tapers to a point, a leafy cap and a bent stem, with a little heat shimmer
+function drawChili(g, x, y, u, now) {
+  g.save(); g.translate(x, y); g.rotate(-.35); g.scale(u * 1.35, u * 1.35);
+  // heat lines
+  g.strokeStyle = `rgba(255,140,60,${.35 + .25 * Math.sin(now / 160)})`; g.lineWidth = 1.6; g.lineCap = 'round';
+  for (const dx of [-9, 0, 9]) { g.beginPath(); g.moveTo(dx + 14, -30); g.quadraticCurveTo(dx + 18, -36, dx + 14, -42); g.stroke(); }
+  // pod
+  const pod = new Path2D();
+  pod.moveTo(-9, -16);
+  pod.bezierCurveTo(-11, -2, -6, 14, 6, 26);   // outer curve down to the tip
+  pod.quadraticCurveTo(12, 31, 10, 24);        // the pointy tip
+  pod.bezierCurveTo(4, 12, 6, -2, 9, -15);     // inner curve back up
+  pod.quadraticCurveTo(0, -20, -9, -16);       // shoulders
+  const grad = g.createLinearGradient(-10, 0, 10, 0);
+  grad.addColorStop(0, '#1f8a3a'); grad.addColorStop(.55, '#38c25a'); grad.addColorStop(1, '#17702e');
+  g.fillStyle = grad; g.fill(pod);
+  g.strokeStyle = '#0f5a22'; g.lineWidth = 1.2; g.stroke(pod);
+  g.strokeStyle = 'rgba(220,255,220,.65)'; g.lineWidth = 2; // shine
+  g.beginPath(); g.moveTo(-5, -10); g.bezierCurveTo(-6, 0, -3, 10, 3, 18); g.stroke();
+  // leafy cap
+  g.fillStyle = '#2d6b1f';
+  g.beginPath(); g.moveTo(-11, -15); g.quadraticCurveTo(-6, -23, 0, -19); g.quadraticCurveTo(6, -24, 11, -14); g.quadraticCurveTo(0, -12, -11, -15); g.fill();
+  // stem
+  g.strokeStyle = '#4b3a1e'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(0, -20); g.quadraticCurveTo(1, -28, -6, -31); g.stroke();
+  g.restore();
+}
+
+async function snakeGame() {
+  setMood('happy');
+  await say('Next game. My snake.');
+  await sleep(300);
+  setMood('smug');
+  await say('It eats anything. Berries are good. Chilis are very, very bad.');
+  await sleep(300);
+  sizeArena(); arena.hidden = false;
+  const u = clamp(Math.min(W, H) / 420, .8, 1.5);
+  const top = H * .22, bot = H * .74, midY = (top + bot) / 2;
+  const sn = { x: W / 2, y: midY, a: -Math.PI / 2, trail: [], len: 9, target: null, speed: 3, back: 0, wait: 0 };
+  let item = null, running = true, last = performance.now(), sparks = [], cough = 0, fade = 0, noPop = 0;
+  let onEat = null;
+  const frame = now => {
+    if (!running) return;
+    const f = Math.min(3, (now - last) / 16.7); last = now;
+    if (W * Math.min(devicePixelRatio || 1, 2) !== arena.width) sizeArena();
+    const g = actx;
+    fade = Math.min(1, fade + .04 * f);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = `rgba(7,6,11,${.97 * fade})`; g.fillRect(0, 0, W, H); // the eye steps aside: the snake gets the screen
+
+    // move: home in on the treat (turning harder up close, so it never circles), or back off after a "no"
+    let tx, ty;
+    if (sn.back > 0) { sn.back -= f; tx = sn.x - Math.cos(sn.a) * 100; ty = sn.y - Math.sin(sn.a) * 100; }
+    else if (sn.target && sn.wait <= 0) { tx = sn.target.x; ty = sn.target.y; }
+    else { tx = W / 2 + Math.cos(now / 1100) * W * .15; ty = midY + Math.sin(now / 800) * (bot - top) * .2; }
+    if (sn.wait > 0) sn.wait -= f * 16.7;
+    const dist = Math.hypot(tx - sn.x, ty - sn.y);
+    const want = Math.atan2(ty - sn.y, tx - sn.x), da = Math.atan2(Math.sin(want - sn.a), Math.cos(want - sn.a));
+    const maxTurn = (sn.target && sn.wait <= 0 ? (dist < 110 * u ? .4 : .14) : .07) * f;
+    sn.a += clamp(da, -maxTurn, maxTurn) + Math.sin(now / 120) * .025;
+    const sp = (sn.back > 0 ? 4 : sn.target && sn.wait <= 0 ? sn.speed : sn.wait > 0 ? .4 : 1.3) * u;
+    sn.x = clamp(sn.x + Math.cos(sn.a) * sp * f, 16 * u, W - 16 * u); sn.y = clamp(sn.y + Math.sin(sn.a) * sp * f, top - 20 * u, bot + 20 * u);
+    if (!sn.trail.length) for (let i = 0; i < 120; i++) sn.trail.push({ x: sn.x, y: sn.y + i * 2 * u });
+    sn.trail.unshift({ x: sn.x, y: sn.y }); sn.trail.length = Math.min(sn.trail.length, 700);
+    if (sn.target && Math.hypot(sn.x - sn.target.x, sn.y - sn.target.y) < 40 * u) { // mouth touches it: got it
+      const it = sn.target; sn.target = null; item = null;
+      if (it.good) { sn.len += 3; tone(880, .1, .05); setTimeout(() => tone(1320, .15, .05), 80); }
+      else { cough = 1; tone(140, .4, .07, 'sawtooth'); }
+      for (let i = 0; i < 12; i++) sparks.push({ x: it.x, y: it.y, vx: (Math.random() - .5) * 6, vy: (Math.random() - .5) * 6, life: 1, c: it.good ? '255,140,160' : '255,150,40' });
+      onEat?.(it);
+    }
+
+    // the treat
+    if (item) {
+      const y = item.y + Math.sin(now / 300) * 4 * u;
+      g.fillStyle = item.good ? 'rgba(255,90,120,.18)' : 'rgba(255,120,30,.2)'; g.beginPath(); g.arc(item.x, y, 34 * u, 0, Math.PI * 2); g.fill();
+      if (item.good) {
+        g.fillStyle = '#ff4d6d'; g.beginPath(); g.arc(item.x, y, 16 * u, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#3ecf8e'; g.beginPath(); g.ellipse(item.x + 4 * u, y - 17 * u, 6 * u, 3 * u, -.6, 0, Math.PI * 2); g.fill();
+      } else {
+        drawChili(g, item.x, y, u, now);
+      }
+    }
+    for (const s of sparks) { s.x += s.vx * f; s.y += s.vy * f; s.life -= .03 * f; g.fillStyle = `rgba(${s.c},${Math.max(0, s.life)})`; g.beginPath(); g.arc(s.x, s.y, 3 * u, 0, Math.PI * 2); g.fill(); }
+    sparks = sparks.filter(s => s.life > 0);
+
+    // the snake
+    const gap = 9 * u, pts = [sn.trail[0]];
+    for (let i = 1, acc = 0; i < sn.trail.length && pts.length <= sn.len; i++) {
+      acc += Math.hypot(sn.trail[i].x - sn.trail[i - 1].x, sn.trail[i].y - sn.trail[i - 1].y);
+      if (acc >= gap) { pts.push(sn.trail[i]); acc = 0; }
+    }
+    for (let i = pts.length - 1; i >= 1; i--) {
+      g.fillStyle = cough > 0 ? (i % 2 ? '#c2502a' : '#e0703a') : (i % 2 ? '#2f9e7e' : '#3fbf98');
+      g.beginPath(); g.arc(pts[i].x, pts[i].y, (13 - 6 * (i / pts.length)) * u, 0, Math.PI * 2); g.fill();
+    }
+    g.save(); g.translate(sn.x, sn.y); g.rotate(sn.a);
+    g.fillStyle = cough > 0 ? '#ff7a45' : '#4fd8ad'; g.beginPath(); g.ellipse(0, 0, 17 * u, 13 * u, 0, 0, Math.PI * 2); g.fill();
+    for (const e of [-1, 1]) { g.fillStyle = '#fff'; g.beginPath(); g.arc(6 * u, e * 5.5 * u, 4.5 * u, 0, Math.PI * 2); g.fill(); g.fillStyle = '#111'; g.beginPath(); g.arc(7.5 * u, e * 5.5 * u, 2.2 * u, 0, Math.PI * 2); g.fill(); }
+    if (cough > 0) {
+      for (let i = 0; i < 6; i++) { g.fillStyle = `rgba(255,${120 + i * 20},40,${cough})`; g.beginPath(); g.arc(20 * u + i * 8 * u, Math.sin(now / 40 + i) * 4 * u, (8 - i) * u, 0, Math.PI * 2); g.fill(); }
+      cough = Math.max(0, cough - .012 * f);
+    } else if (Math.sin(now / 90) > .3) { g.strokeStyle = '#ff4d6d'; g.lineWidth = 2; g.beginPath(); g.moveTo(16 * u, 0); g.lineTo(25 * u, -2 * u); g.stroke(); }
+    g.restore();
+    // "NO!" pops up over the snake when you shake your head
+    if (noPop > 0) {
+      g.save(); g.globalAlpha = Math.min(1, noPop); g.fillStyle = '#ff6a52'; g.textAlign = 'center';
+      g.font = `italic ${Math.round(48 * u * (1.3 - noPop * .3))}px "Instrument Serif", Georgia, serif`;
+      g.fillText('No!', clamp(sn.x, 60 * u, W - 60 * u), Math.max(top, sn.y - 40 * u)); g.restore();
+      noPop = Math.max(0, noPop - .02 * f);
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  const shook = makeShakeDetector();
+  // one treat: the snake goes for it; you shake "no" or you don't. Resolves 'ate' or 'stopped'.
+  // `secs` = how long you get before it arrives. The treat always appears far from the snake.
+  const round = async (good, secs, fakeOut) => {
+    let x, y, tries = 0;
+    do { x = W * (.12 + Math.random() * .76); y = top + 40 * u + Math.random() * (bot - top - 80 * u); }
+    while (Math.hypot(x - sn.x, y - sn.y) < Math.min(W, H) * .45 && ++tries < 40);
+    const speed = Math.hypot(x - sn.x, y - sn.y) / (secs * 60) / u; // px per frame, in u
+    item = { x, y, good }; sn.target = item; sn.speed = speed * u; sn.wait = 500;
+    let ate = false; onEat = () => { ate = true; };
+    let tapped = false; const tap = () => { tapped = true; }; addEventListener('pointerdown', tap);
+    let faked = !fakeOut;
+    const result = await new Promise(resolve => {
+      const tick = () => {
+        if (ate) return resolve('ate');
+        const saidNo = shook() || tapped;
+        if (saidNo && Math.hypot(sn.x - x, sn.y - y) < 70 * u) { tapped = false; aside('Too late!', 900); } // already there: it eats anyway
+        else if (saidNo) { // "no!" in time
+          noPop = 1; tone(220, .25, .06, 'square'); sn.target = null; sn.back = 18; item = null;
+          for (let i = 0; i < 10; i++) sparks.push({ x, y, vx: (Math.random() - .5) * 5, vy: (Math.random() - .5) * 5, life: 1, c: '200,200,220' });
+          return resolve('stopped');
+        }
+        // a fake-out: it pauses halfway, then lunges
+        if (!faked && Math.hypot(sn.x - x, sn.y - y) < Math.hypot(W, H) * .2) { faked = true; sn.wait = 700; setTimeout(() => { sn.speed = speed * 1.6 * u; }, 700); }
+        setTimeout(tick, 40);
+      };
+      tick();
+    });
+    removeEventListener('pointerdown', tap);
+    onEat = null;
+    await sleep(500);
+    return result;
+  };
+
+  // practice, which is the "did you get it" check: a chili, coming slowly. Say no.
+  banner('Snake', 'Chili? Shake your head “no”');
+  setMood('quizzical');
+  await say('Watch. It\'s going for the chili. Shake your head. No no no.');
+  let r = await round(false, 3.2, false);
+  if (r === 'ate') {
+    setMood('smug');
+    await say('Fire. That\'s what happens. Shake your head next time. Like you mean it.');
+    r = await round(false, 3.2, false);
+  }
+  setMood(r === 'stopped' ? 'delighted' : 'sulk');
+  await say(r === 'stopped' ? 'It listened. To YOU. Weird.' : 'Poor snake. Okay, let\'s just play.');
+  await sleep(300);
+
+  // the game: 8 quick ones. Berries: let it eat. Chilis: no.
+  const plan = [true, false, true, false, false, true, false, true].sort(() => Math.random() - .5);
+  let right = 0;
+  for (let i = 0; i < plan.length; i++) {
+    const good = plan[i];
+    banner(`${i + 1} of ${plan.length}`, 'Berry: let it eat · Chili: shake “no”');
+    const res = await round(good, 2.4 - i * .12, !good && i > 2 && Math.random() < .5); // a little less time each round: 2.4s down to 1.6s
+    if (good && res === 'ate') { right++; aside(pick(['Yum.', 'Good snake.', 'Crunch.']), 900); }
+    else if (good) { setMood('annoyed'); aside(pick(['You said no to a BERRY? Monster.', 'That was a berry. It\'s crying now.']), 1500); }
+    else if (res === 'stopped') { right++; aside(pick(['Bad snake. Good human.', 'Saved it.', 'Denied.']), 900); }
+    else { setMood('evil'); aside(pick(['HOT. Hot hot hot.', 'It\'s breathing fire. Happy now?', 'Too slow. Spicy.']), 1500); }
+    setTimeout(() => setMood('happy'), 900);
+    await sleep(300);
+  }
+  running = false; arena.hidden = true; actx.clearRect(0, 0, W, H);
+  banner(`${right} of ${plan.length}`, 'The snake has feelings about this');
+  setMood(right >= 7 ? 'delighted' : right >= 4 ? 'smug' : 'sulk');
+  await say(right >= 7 ? `${right} out of ${plan.length}. The snake trusts you now. Terrifying.` : right >= 4 ? `${right} out of ${plan.length}. The snake is… mostly unburnt.` : `${right} out of ${plan.length}. That snake needs a new human.`);
+  await sleep(1400);
+  banner(null);
+  await sleep(300);
+}
+
+// ---------- Scene: join my stars ----------
+// Five big stars, far apart: left, top, right, bottom, middle. Look toward the glowing one and hold it,
+// and it locks and a line of light joins it to the last one. Together they draw the eye itself.
+// Only the rough direction you face matters (head and eyes together), never an exact spot, so it works on webcams.
+async function joinStars() {
+  setMood('smug');
+  await say('My turn to look pretty.');
+  await sleep(300);
+  await say('Help me draw myself. In the stars.');
+  await sleep(300);
+  await confirmReady('Join my stars', 'Look at the glowing star · hold it till it locks', 'look at the bright star. Hold. Click. Next one.');
+  // where "looking at the middle" is for you: measured while you look at me
+  setMood('calm');
+  await say('Look at me first.');
+  const sig = () => ({ x: -face.yaw - face.irisH * 1.5, y: face.noseDy * 2 + face.eyeY * .5 }); // + = your right, + = down
+  const acc = { x: 0, y: 0 }; let n = 0, t0 = performance.now();
+  while (performance.now() - t0 < 1000) { if (face.present) { const s = sig(); acc.x += s.x; acc.y += s.y; n++; } await sleep(40); }
+  const b = n ? { x: acc.x / n, y: acc.y / n } : { x: 0, y: 0 };
+  const testMouse = !face.present; // no camera (testing): the mouse plays your eyes
+  const look = () => {
+    if (testMouse || !face.present) return pointer ? { x: (pointer.x - W / 2) / W * .5, y: (pointer.y - H / 2) / H * .4 } : { x: 0, y: 0 };
+    const s = sig(); return { x: s.x - b.x, y: s.y - b.y };
+  };
+
+  sizeArena(); arena.hidden = false;
+  const eyeCv = $('#eye'); eyeCv.style.transition = 'opacity .6s'; eyeCv.style.opacity = 0; // the stars become the eye
+  $('#line').textContent = '';
+  const u = clamp(Math.min(W, H) / 420, .8, 1.5);
+  const cx = W / 2, cy = H * .5, R = Math.min(H * .2, W * .3);
+  const stars = [
+    { x: W * .14, y: cy, dir: [-1, 0] }, { x: cx, y: cy - R, dir: [0, -1] }, { x: W * .86, y: cy, dir: [1, 0] },
+    { x: cx, y: cy + R, dir: [0, 1] }, { x: cx, y: cy, dir: null },
+  ].map(s => ({ ...s, lit: 0, fill: 0 }));
+  let cur = 0, running = true, last = performance.now(), fade = 0, done = 0, sparks = [];
+  const twinkle = Array.from({ length: 70 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.4 + .3, p: Math.random() * 6 }));
+  const drawStar = (g, x, y, r, a) => {
+    g.save(); g.translate(x, y); g.globalAlpha = a;
+    const glow = g.createRadialGradient(0, 0, 0, 0, 0, r * 3); glow.addColorStop(0, 'rgba(255,236,170,.55)'); glow.addColorStop(1, 'rgba(255,236,170,0)');
+    g.fillStyle = glow; g.beginPath(); g.arc(0, 0, r * 3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff6d8'; g.beginPath();
+    for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * .38 : r, an = i * Math.PI / 4 - Math.PI / 2; g.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+    g.closePath(); g.fill(); g.restore();
+  };
+  const frame = now => {
+    if (!running) return;
+    const f = Math.min(3, (now - last) / 16.7); last = now;
+    const g = actx; fade = Math.min(1, fade + .04 * f);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = `rgba(5,6,16,${.97 * fade})`; g.fillRect(0, 0, W, H);
+    for (const t of twinkle) { g.fillStyle = `rgba(255,255,255,${(.25 + .25 * Math.sin(now / 700 + t.p)) * fade})`; g.beginPath(); g.arc(t.x, t.y, t.r, 0, Math.PI * 2); g.fill(); }
+    // lines of light between locked stars, plus one growing toward the star you're on
+    g.lineCap = 'round'; g.strokeStyle = 'rgba(255,230,160,.85)'; g.lineWidth = 3 * u; g.shadowColor = 'rgba(255,220,140,.9)'; g.shadowBlur = 12 * u;
+    if (done < .01) {
+      for (let i = 1; i < 4 && i < cur + 1; i++) {
+        const a = stars[i - 1], c = stars[i], k = i < cur ? 1 : stars[i].fill;
+        if (k > 0) { g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(a.x + (c.x - a.x) * k, a.y + (c.y - a.y) * k); g.stroke(); }
+      }
+      if (cur >= 4) { const a = stars[3], c = stars[0]; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(c.x, c.y); g.stroke(); } // closing the shape
+      if (cur === 4 && stars[4].fill > 0) { g.beginPath(); g.arc(cx, cy, R * .42, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * stars[4].fill); g.stroke(); }
+    } else {
+      // finished: the diamond relaxes into an eye, which blinks at you
+      const open = 1 - Math.max(0, Math.sin(Math.min(1, (done - 1) / .5) * Math.PI)) * (done > 1 ? 1 : 0);
+      const lw = W * .36, lh = R * 1.05 * Math.max(.04, open);
+      g.beginPath(); g.moveTo(cx - lw, cy); g.quadraticCurveTo(cx, cy - lh * 2, cx + lw, cy); g.quadraticCurveTo(cx, cy + lh * 2, cx - lw, cy); g.stroke();
+      if (open > .3) { g.beginPath(); g.arc(cx, cy, R * .42 * Math.min(1, open * 1.3), 0, Math.PI * 2); g.stroke(); g.fillStyle = 'rgba(255,236,170,.9)'; g.beginPath(); g.arc(cx, cy, R * .14, 0, Math.PI * 2); g.fill(); }
+      done += .012 * f;
+    }
+    g.shadowBlur = 0;
+    // the stars: the one to look at pulses, with a ring that fills as you hold it
+    stars.forEach((s, i) => {
+      s.lit = Math.min(1, s.lit + (i < cur ? .08 : 0) * f);
+      const active = i === cur && done < .01, pulse = active ? 1 + .18 * Math.sin(now / 160) : 1;
+      if (done < .01 || i === 4) drawStar(g, s.x, s.y, (i < cur ? 15 : active ? 17 : 9) * u * pulse, (i < cur ? 1 : active ? 1 : .35) * fade);
+      if (active) {
+        g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 4 * u; g.beginPath(); g.arc(s.x, s.y, 34 * u, 0, Math.PI * 2); g.stroke();
+        g.strokeStyle = '#ffe9a8'; g.beginPath(); g.arc(s.x, s.y, 34 * u, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * s.fill); g.stroke();
+      }
+    });
+    for (const p of sparks) { p.x += p.vx * f; p.y += p.vy * f; p.life -= .03 * f; g.fillStyle = `rgba(255,236,170,${Math.max(0, p.life)})`; g.beginPath(); g.arc(p.x, p.y, 2.5 * u, 0, Math.PI * 2); g.fill(); }
+    sparks = sparks.filter(p => p.life > 0);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  const hints = ['Turn your head toward it a little. It helps.', 'The glowing one. Look at it. Hold.', 'Point your nose at it if your eyes are shy.'];
+  const startAll = performance.now();
+  let selfLocked = 0;
+  for (cur = 0; cur < stars.length; cur++) {
+    const s = stars[cur];
+    banner(`Star ${cur + 1} of ${stars.length}`, cur === 4 ? 'Now look back at the middle' : 'Look at the glowing star · hold it');
+    let tapped = false; const tap = e => { if (Math.hypot(e.clientX - s.x, e.clientY - s.y) < 70 * u) tapped = true; };
+    addEventListener('pointerdown', tap);
+    const t1 = performance.now(); let lastT = t1, hinted = 0;
+    while (s.fill < 1) {
+      await sleep(30);
+      const now = performance.now(), dt = now - lastT; lastT = now;
+      const waited = now - t1;
+      const T = Math.max(.04, .12 * Math.pow(.9, waited / 2500)); // asks for less the longer it takes
+      const v = look();
+      let on;
+      if (s.dir) {
+        const along = v.x * s.dir[0] + v.y * s.dir[1] * 1.4, side = Math.abs(v.x * s.dir[1] - v.y * s.dir[0]);
+        on = along > T && along > side * 1.1;
+      } else on = Math.hypot(v.x, v.y * 1.4) < .07;
+      s.fill = tapped ? 1 : clamp(s.fill + (on ? dt / 900 : -dt / 2500), 0, 1);
+      if (on && Math.random() < .25) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - .5) * 3, vy: (Math.random() - .5) * 3, life: .8 });
+      if (waited > 6000 && hinted === 0 || waited > 11000 && hinted === 1) { aside(hints[(cur + hinted) % hints.length], 2200); hinted++; }
+      if (waited > 15000) { s.fill = 1; selfLocked++; aside('Fine. I\'ll do that one myself.', 1800); }
+    }
+    removeEventListener('pointerdown', tap);
+    tone(660 + cur * 110, .14, .05); setTimeout(() => tone(990 + cur * 110, .18, .04), 90);
+    for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - .5) * 6, vy: (Math.random() - .5) * 6, life: 1 });
+    if (cur === 1) aside(pick(['Ooh.', 'Pretty.', 'Keep going.']), 900);
+    await sleep(350);
+  }
+  const secs = Math.round((performance.now() - startAll) / 1000);
+  banner('It\'s me', `${secs} seconds`);
+  done = .02; tone(523, .2, .05); setTimeout(() => tone(784, .3, .05), 160); setTimeout(() => tone(1047, .4, .04), 330);
+  await sleep(2300);
+  running = false; arena.hidden = true; actx.clearRect(0, 0, W, H); eyeCv.style.opacity = 1; banner(null);
+  setMood('delighted');
+  await say('Look at that. Gorgeous. It even blinked.');
+  await sleep(300);
+  setMood(selfLocked >= 2 ? 'sulk' : 'smug');
+  await say(selfLocked >= 2 ? 'I did half of it myself, but sure. Teamwork.' : secs < 20 ? 'Fast. Your neck is very talented.' : secs < 40 ? `${secs} seconds. Sundials are faster, but okay.` : `${secs} seconds. I aged.`);
+  await sleep(1200);
+  banner(null);
+  await sleep(300);
+}
+
+// ---------- Chapter 2, scene 2: the jealous eye ----------
+// Another eye shows up. A glamorous one. You vote who's prettier by turning your head toward them (or tapping).
+// The eye does not take it well.
+function drawRival(g, x, y, ew, t, r) {
+  if (r.alpha <= .01) return;
+  const eh = ew * .62, open = Math.max(.04, r.open);
+  g.save(); g.globalAlpha = r.alpha;
+  g.translate(x, y); g.scale(r.size, r.size); g.translate(-x, -y);
+  // dreamy pink glow and eyeshadow
+  const glow = g.createRadialGradient(x, y, 0, x, y, ew * 1.8);
+  glow.addColorStop(0, 'rgba(255,95,162,.22)'); glow.addColorStop(1, 'rgba(255,95,162,0)');
+  g.fillStyle = glow; g.beginPath(); g.arc(x, y, ew * 1.8, 0, Math.PI * 2); g.fill();
+  const shadow = g.createLinearGradient(0, y - eh * 1.6, 0, y);
+  shadow.addColorStop(0, 'rgba(160,60,200,0)'); shadow.addColorStop(1, 'rgba(160,60,200,.45)');
+  g.fillStyle = shadow;
+  g.beginPath(); g.moveTo(x - ew * 1.05, y); g.quadraticCurveTo(x, y - eh * 2.1, x + ew * 1.1, y - eh * .1); g.quadraticCurveTo(x, y - eh * 1.2 * open, x - ew * 1.05, y); g.fill();
+  // the almond
+  const lid = () => { g.beginPath(); g.moveTo(x - ew, y); g.quadraticCurveTo(x, y - eh * 1.25 * open, x + ew, y - eh * .08); g.quadraticCurveTo(x, y + eh * 1.05 * open, x - ew, y); };
+  lid(); g.fillStyle = '#fbeff3'; g.fill();
+  g.save(); lid(); g.clip();
+  const ix = x + r.lx * ew * .35, iy = y + r.ly * eh * .3, ir = eh * .62;
+  const iris = g.createRadialGradient(ix, iy, ir * .2, ix, iy, ir);
+  iris.addColorStop(0, '#ff9ccc'); iris.addColorStop(.55, '#d63a8f'); iris.addColorStop(1, '#5a1a6e');
+  g.fillStyle = iris; g.beginPath(); g.arc(ix, iy, ir, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#120612'; g.beginPath(); g.arc(ix, iy, ir * .42, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff';
+  g.beginPath(); g.arc(ix - ir * .3, iy - ir * .32, ir * .17, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(ix + ir * .25, iy + ir * .2, ir * .07, 0, Math.PI * 2); g.fill();
+  g.restore();
+  // liner and big flicky lashes
+  g.strokeStyle = '#0d0610'; g.lineCap = 'round';
+  g.lineWidth = ew * .07; g.beginPath(); g.moveTo(x - ew, y); g.quadraticCurveTo(x, y - eh * 1.25 * open, x + ew, y - eh * .08); g.lineTo(x + ew * 1.18, y - eh * .38); g.stroke();
+  g.lineWidth = ew * .035;
+  for (let i = 0; i < 9; i++) {
+    const u = .12 + i * .1, px = (1 - u) * (1 - u) * (x - ew) + 2 * (1 - u) * u * x + u * u * (x + ew);
+    const py = (1 - u) * (1 - u) * y + 2 * (1 - u) * u * (y - eh * 1.25 * open) + u * u * (y - eh * .08);
+    const ang = -Math.PI / 2 + (u - .45) * 1.6 + .15, len = ew * (.22 + .18 * Math.sin(u * Math.PI));
+    g.beginPath(); g.moveTo(px, py); g.quadraticCurveTo(px + Math.cos(ang) * len * .4, py + Math.sin(ang) * len * .9, px + Math.cos(ang + .5) * len, py + Math.sin(ang + .5) * len); g.stroke();
+  }
+  // a beauty mark
+  g.fillStyle = '#2a0f22'; g.beginPath(); g.arc(x + ew * .75, y + eh * .75, ew * .035, 0, Math.PI * 2); g.fill();
+  g.restore();
+  // sparkles
+  for (const sp of r.sparkles) {
+    const a = 1 - sp.age;
+    if (a <= 0) continue;
+    g.save(); g.globalAlpha = a * r.alpha; g.fillStyle = '#ffd6ec'; g.translate(sp.x, sp.y); g.rotate(sp.age * 3);
+    const k = ew * .08 * (1 + sp.age);
+    g.beginPath(); for (let j = 0; j < 8; j++) { const rr = j % 2 ? k * .3 : k; g.lineTo(Math.cos(j * Math.PI / 4) * rr, Math.sin(j * Math.PI / 4) * rr); } g.fill();
+    g.restore();
+  }
+  // what she says
+  if (r.line) {
+    g.save(); g.globalAlpha = r.alpha * r.lineA; g.textAlign = 'center'; g.fillStyle = '#ff9ccc';
+    g.font = `italic ${Math.round(clamp(ew * .26, 14, 24))}px "Instrument Serif", Georgia, serif`;
+    g.fillText(r.line, x, y + eh * 2.1);
+    g.restore();
+  }
+}
+
+async function jealousEye() {
+  sizeArena(); arena.hidden = false;
+  const R = { alpha: 0, size: .6, open: 1, lx: 0, ly: 0, sparkles: [], line: '', lineA: 0, gone: false };
+  const portrait = H > W;
+  const SPLIT = portrait ? .24 : .22, SMALL = portrait ? .42 : .62;
+  const rivalX = () => W / 2 + SPLIT * W, eyeY = () => H * .4;
+  const rivalEw = () => Math.min(W * .4, H * .3) * SMALL;
+  let running = true, last = performance.now(), votes = { me: 0, her: 0 }, holdL = 0, holdR = 0, show = false;
+  const sparkle = n => { for (let i = 0; i < n; i++) R.sparkles.push({ x: rivalX() + (Math.random() - .5) * rivalEw() * 2.4, y: eyeY() + (Math.random() - .7) * rivalEw() * 1.5, age: Math.random() * -.5 }); tone(1800 + Math.random() * 600, .15, .03); };
+  const herSay = async (line, ms = 2000) => { R.line = line; R.lineA = 1; await sleep(ms); R.lineA = 0; };
+  const frame = now => {
+    if (!running) return;
+    const f = Math.min(3, (now - last) / 16.7); last = now;
+    if (W * Math.min(devicePixelRatio || 1, 2) !== arena.width) sizeArena();
+    actx.clearRect(0, 0, W, H);
+    for (const sp of R.sparkles) sp.age += .02 * f;
+    R.sparkles = R.sparkles.filter(sp => sp.age < 1);
+    drawRival(actx, rivalX(), eyeY(), rivalEw(), now, R);
+    if (show) { // vote bars under each eye
+      const bw = rivalEw() * 1.6, by = eyeY() + rivalEw() * .62 * 1.6;
+      for (const [cx, h] of [[W / 2 - SPLIT * W, holdL], [rivalX(), holdR]]) {
+        actx.fillStyle = 'rgba(239,230,216,.15)'; actx.fillRect(cx - bw / 2, by, bw, 6);
+        actx.fillStyle = '#6fc3b8'; actx.fillRect(cx - bw / 2, by, bw * h, 6);
+      }
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  // she arrives
+  setMood('quizzical');
+  await say('I have to tell you something.');
+  await sleep(500);
+  setMood('sulk');
+  await say('There\'s… another eye.');
+  T.offX = -SPLIT; T.scale = SMALL;
+  await sleep(1500); // let it scoot over first
+  for (let i = 0; i <= 20; i++) { R.alpha = i / 20; R.size = .6 + .4 * (i / 20); await sleep(30); }
+  sparkle(10);
+  await herSay('Hiii. I\'m Iris. ✨', 1800);
+  glance = { x: 1, y: 0, until: performance.now() + 2500 };
+  setMood('annoyed');
+  await say('She thinks she\'s prettier than me.');
+  await sleep(400);
+  await herSay('I don\'t think. I know.', 1600);
+  setMood('angry');
+  await say('Settle this. Three rounds.');
+  await sleep(300);
+
+  // teach the vote, and learn what your head does: this is the "did you get it" check
+  banner('Who\'s prettier?', 'Turn your head toward one to vote · or tap');
+  setMood('happy');
+  await say('To vote for me, turn your head toward me. Try it.');
+  holdL = 1; await sleep(1200);
+  gcal.L = await sampleGaze(900); holdL = 0;
+  setMood('smug');
+  await say('Good. And that way is her. Just to test. Don\'t get used to it.');
+  holdR = 1; await sleep(1200);
+  gcal.R = await sampleGaze(900); holdR = 0;
+  gcal.ok = Math.hypot(gcal.R[0] - gcal.L[0], gcal.R[1] - gcal.L[1]) > .05;
+  setMood('calm');
+  await say(gcal.ok ? 'Got it. Look back at the middle.' : 'You barely moved. Turn your WHOLE head. Or tap. Look back at the middle.');
+  await sleep(1200);
+
+  const ROUNDS = [
+    { her: async () => { R.open = .05; sparkle(8); await sleep(350); R.open = 1; await herSay('*wink*', 1500); }, me: async () => { setMood('delighted'); await say('I can do… this.'); await sleep(900); } },
+    { her: async () => { for (let i = 0; i < 6; i++) { R.open = .1; await sleep(90); R.open = 1; await sleep(110); } await herSay('My lashes are real, by the way.', 1800); }, me: async () => { setMood('surprised'); await say('I can open REALLY wide. Look.'); await sleep(1000); } },
+    { her: async () => { for (let a = 0; a < Math.PI * 2; a += .2) { R.lx = Math.cos(a); R.ly = Math.sin(a); await sleep(35); } R.lx = R.ly = 0; sparkle(12); await herSay('Mesmerising, right?', 1800); }, me: async () => { T.hypno = 1; setMood('calm'); await say('I can literally hypnotise you.'); await sleep(1400); T.hypno = 0; } },
+  ];
+  for (let round = 0; round < 3 && !R.gone; round++) {
+    banner(`Round ${round + 1}`, 'Watch them both');
+    glance = { x: 1, y: 0, until: performance.now() + 3500 };
+    setMood('annoyed');
+    await ROUNDS[round].her();
+    glance = null;
+    await ROUNDS[round].me();
+    setMood('calm');
+
+    // vote
+    banner(`Round ${round + 1}: who\'s prettier?`, 'Turn your head toward one · or tap');
+    show = true; holdL = holdR = 0;
+    const c = await sampleGaze(500);
+    const off = [c[0] - (gcal.L[0] + gcal.R[0]) / 2, c[1] - (gcal.L[1] + gcal.R[1]) / 2];
+    let chosen = 0, sm = .5, side = 0, held = 0, lastT = performance.now();
+    const tap = e => { chosen = e.clientX < W / 2 ? -1 : 1; };
+    addEventListener('pointerdown', tap);
+    const t0 = performance.now();
+    while (!chosen && performance.now() - t0 < 9000) {
+      const now = performance.now(), dt = now - lastT; lastT = now;
+      let s = 0;
+      if (face.present && !face.blinking && gcal.ok) { sm = lerp(sm, gazeT(off), .3); s = sm < .32 ? -1 : sm > .68 ? 1 : 0; }
+      else if (face.present && !face.blinking) { const d = -(face.yaw - c[1]); s = d < -.05 ? -1 : d > .05 ? 1 : 0; }
+      else if (!camOK && pointer) s = pointer.x < W / 2 ? -1 : 1;
+      if (s && s !== side) held = 0;
+      if (s) side = s;
+      held = s ? held + dt : Math.max(0, held - dt * 2);
+      holdL = side === -1 ? clamp(held / 1000, 0, 1) : 0; holdR = side === 1 ? clamp(held / 1000, 0, 1) : 0;
+      if (held >= 1000) chosen = side;
+      await sleep(30);
+    }
+    removeEventListener('pointerdown', tap);
+    show = false; banner(null);
+    if (!chosen) { setMood('sulk'); await say('No vote? Cowardly. Counts for me.'); chosen = -1; }
+    tone(880, .15, .05);
+
+    if (chosen === -1) {
+      votes.me++;
+      setMood('delighted');
+      await say(pick(['Obviously.', 'Correct answer.', 'See? Taste.']));
+      R.open = .5; await herSay(pick(['Hmph.', 'Whatever.', 'Rigged.']), 1300); R.open = 1;
+    } else {
+      votes.her++;
+      sparkle(14); await herSay(pick(['Thank youuu. ✨', 'Obviously.', 'Finally, some taste.']), 1300);
+      if (votes.her === 1) { getAngry(); await say('Her? HER?'); await sleep(500); }
+      else {
+        setMood('evil');
+        await say('Twice. You picked her twice.');
+        await sleep(500);
+        await say('There\'s only room for one eye around here.');
+        await sleep(300);
+        // zap
+        S.flash = 1; S.shake = .8; for (let i = 0; i < 8; i++) setTimeout(() => tone(400 + Math.random() * 1600, .05, .06, 'square'), i * 40);
+        R.line = 'Hey—'; R.lineA = 1;
+        for (let i = 20; i >= 0; i--) { R.size = i / 20; R.alpha = i / 20; await sleep(25); }
+        R.gone = true; R.lineA = 0;
+        await sleep(600);
+        setMood('smug');
+        await say('Oops.');
+        await sleep(500);
+        await evilLaugh();
+      }
+    }
+    setMood('calm');
+    await sleep(500);
+  }
+
+  if (!R.gone) {
+    if (votes.her === 0) {
+      setMood('delighted');
+      await say(`Three for three. Loyal, ${name}.`);
+      await herSay('Ugh. Your loss.', 1400);
+    } else {
+      setMood('smug');
+      await say('You picked her once. I saw it. I\'ll let it go.');
+      await sleep(400);
+      await say('I won\'t, actually.');
+    }
+    for (let i = 20; i >= 0; i--) { R.alpha = i / 20; await sleep(25); }
+  }
+  running = false; arena.hidden = true; actx.clearRect(0, 0, W, H);
+  T.offX = 0; T.scale = 1; glance = null; banner(null);
+  await sleep(900);
+}
+
+// ---------- Chapter 2, scene 3: copycat ----------
+// First the eye copies your face, live. Then you copy the eye. Then you try to make a face it can't copy.
+let exBase = null; // your resting face, so expressions are measured from *your* neutral
+function exDelta() {
+  const e = face.ex, b = exBase || {};
+  const d = {};
+  for (const k in e) d[k] = clamp((e[k] - (b[k] || 0)) / (1 - (b[k] || 0) || 1), 0, 1);
+  return d;
+}
+function mirrorFace(d) {
+  Object.assign(T, NEUTRAL);
+  T.smile = d.smile * 1.1; T.joy = d.smile; T.bounce = d.smile * .35;
+  T.up = 1 + d.jaw * .4 - d.squint * .45 - d.browDown * .25; T.lo = 1 + d.jaw * .2 - d.squint * .25;
+  T.stretch = d.jaw;
+  T.slant = d.browDown * .7; T.anger = d.browDown * .8; T.browTilt = d.browDown; T.browW = 1 + d.browDown * .5; // you frown: it glares
+  T.up += d.browUp * .35; T.browY = -d.browUp * 1.1 + d.browDown * .6; T.browQuiz = d.browOne; // raised brows: it opens wide and raises its own
+  T.pupilAdj = d.jaw * -.15 + d.smile * .08 - d.browUp * .08;
+  if (d.wink > .4) T.up = Math.min(T.up, .08); // you wink, it winks
+}
+
+// Mirror your face onto the eye, live, until the returned function is called. Exaggerated so it reads clearly.
+function startMirror(gain = 1.6) {
+  let on = true;
+  (async () => {
+    while (on) {
+      if (face.present) { const d = exDelta(); for (const k in d) d[k] = clamp(d[k] * gain, 0, 1); mirrorFace(d); }
+      await sleep(33);
+    }
+  })();
+  return () => { on = false; };
+}
+
+async function copycat() {
+  if (!camOK || !landmarker) return;
+  live = false;
+  setMood('happy');
+  await say('Last game. It\'s called copycat.');
+  await sleep(400);
+  await say('You make a face. I copy it.');
+  await sleep(400);
+  banner('Copycat', 'Make faces. The eye copies them.');
+  setMood('calm');
+  await say('Relax your face for a second. Normal face. Boring face.');
+  // learn your resting face
+  const acc = {}; let n = 0; const t0 = performance.now();
+  while (performance.now() - t0 < 1500) {
+    if (face.present && !face.blinking) { n++; for (const k in face.ex) acc[k] = (acc[k] || 0) + face.ex[k]; }
+    await sleep(40);
+  }
+  exBase = {}; for (const k in acc) exBase[k] = acc[k] / Math.max(1, n);
+
+  // the "did you get it" check: smile, and watch it smile back
+  setMood('quizzical');
+  await say('Now smile at me.');
+  let copying = true;
+  const loop = async () => { while (copying) { if (face.present) mirrorFace(exDelta()); await sleep(33); } };
+  loop();
+  const smiled = await waitUntil(() => exDelta().smile > .3, 9000);
+  await say(smiled ? 'See? I copy everything.' : 'Smile. With your mouth. Like a person.');
+  if (!smiled) await waitUntil(() => exDelta().smile > .3, 8000);
+  await sleep(500);
+
+  // free play: it copies, and comments on what it sees
+  banner('Copycat', 'Smile · frown · raise your eyebrows · open your mouth · wink');
+  await say('Go on. Make faces. Eyebrows. Frown. Mouth open. Wink.');
+  const seen = new Set(), t1 = performance.now();
+  const LINES = {
+    browUp: 'Ooh, eyebrows. Fancy.', browDown: 'Grumpy. I can do grumpy.', jaw: 'Close your mouth. Flies.',
+    wink: 'Did you just wink at me?', squint: 'Suspicious. I like it.', pucker: 'Are you… kissing me? Gross.',
+  };
+  while (performance.now() - t1 < 14000) {
+    const d = exDelta();
+    for (const [k, line] of Object.entries(LINES)) {
+      const hit = k === 'wink' ? d.wink > .4 : d[k] > .35;
+      if (hit && !seen.has(k)) { seen.add(k); aside(line, 2200); }
+    }
+    await sleep(100);
+  }
+  copying = false;
+  setMood('smug');
+  await say(seen.size >= 3 ? `${seen.size} faces. Very expressive, ${name}.` : 'That\'s it? Your face does so little.');
+  await sleep(600);
+
+  // now you copy me
+  const ROUNDS = [
+    { mood: 'happy', title: 'Smile', line: 'Now YOU copy ME. Smile.', ok: d => d.smile > .3 },
+    { mood: 'surprised', title: 'Surprised', line: 'Surprised! Eyebrows up, mouth open.', ok: d => (d.jaw > .22 && d.browUp > .12) || d.jaw > .45 },
+    { mood: 'angry', title: 'Angry', line: 'Angry. Frown at me.', ok: d => d.browDown > .2 },
+    { mood: 'smug', title: 'Suspicious', line: 'Suspicious. Squint.', ok: d => d.squint > .25 || d.browDown > .3 },
+    { mood: 'delighted', title: 'Kissy face', line: 'Kissy face. Lips out.', ok: d => d.pucker > .3 },
+  ];
+  let got = 0;
+  for (const [i, r] of ROUNDS.entries()) {
+    setMood(r.mood);
+    banner(r.title, `Copy the eye · ${i + 1} of ${ROUNDS.length}`);
+    tone(520, .12, .05);
+    await say(r.line, 34);
+    let since = 0;
+    const ok = await waitUntil(() => {
+      const hit = face.present && r.ok(exDelta());
+      since = hit ? since || performance.now() : 0;
+      return since && performance.now() - since > 250;
+    }, 5000);
+    if (ok) { got++; tone(880, .12, .05); setTimeout(() => tone(1320, .18, .04), 90); aside(pick(['Nailed it.', 'Yes!', 'Good face.', 'Perfect.']), 1400); }
+    else aside(pick(['Not even close.', 'What was that?', 'Your face said no.']), 1400);
+    await sleep(900);
+  }
+  banner(`${got} of ${ROUNDS.length}`, 'Faces copied');
+  setMood(got >= 4 ? 'delighted' : got >= 2 ? 'smug' : 'sulk');
+  await say(got >= 4 ? 'Wow. Your face is a professional.' : got >= 2 ? `${got} out of ${ROUNDS.length}. Your face tried.` : 'Did your face fall asleep?');
+  await sleep(900);
+
+  // finale: a face it can't copy
+  banner('Your turn', 'Make the weirdest face you can');
+  setMood('smug');
+  await say('Last one. Make a face I can\'t copy. I\'ll wait.');
+  await sleep(2600);
+  copying = true; loop(); // it tries
+  await sleep(1500);
+  copying = false;
+  for (const m of ['surprised', 'angry', 'quizzical', 'delighted', 'sad', 'evil', 'surprised']) { setMood(m); S.shake = .3; tone(200 + Math.random() * 800, .06, .04, 'square'); await sleep(170); }
+  setMood('surprised');
+  await say('I… can\'t do that.');
+  await sleep(500);
+  setMood('quizzical');
+  await say('Nobody can do that. What IS that?');
+  await sleep(600);
+  setMood('smug');
+  await say('Fine. You win this one. Don\'t make that face again.');
+  banner(null);
+  await sleep(1200);
+}
+
+// ---------- Parked: the personality read (not in the game right now) ----------
+// Two pictures side by side. It watches which one you look at: how long, which first, how often you switch.
+// File "left" is always pole A of the scale; the sides are shuffled on screen.
+const PAIRS = [
+  { scale: null, a: 'the espresso', b: 'the matcha',
+    aWin: ['Coffee. Of course. Your blood is 40% espresso.', 'Espresso. Tiny cup. Big problems.'],
+    bWin: ['Matcha. You own a yoga mat you\'ve used twice.', 'Green foam. Very calm. Very suspicious.'] },
+  { scale: 'energy', a: 'the puppy', b: 'the cat',
+    aWin: ['The puppy. You like being liked.', 'Dog person. Loud. Loyal. Sheds feelings everywhere.'],
+    bWin: ['The cat. Of course. Independent. Judgy. Like me.', 'Cat. You\'d ignore me on purpose.'] },
+  { scale: 'energy', a: 'the city', b: 'the wolf',
+    aWin: ['The crowd. You charge your battery off other people.', 'City lights. You need witnesses.'],
+    bWin: ['The wolf. Alone on a mountain. Very dramatic.', 'Wolf. You\'d leave a party without saying bye.'] },
+  { scale: 'pace', a: 'the mountain', b: 'the lake',
+    aWin: ['The peak. You climb things just to say you did.', 'Mountain. You\'re exhausting. I mean that nicely.'],
+    bWin: ['The lake. You want nothing to happen. Ever.', 'Still water. Still you.'] },
+  { scale: 'pace', a: 'the cliff dive', b: 'the reading nook',
+    aWin: ['The cliff. Your mother worries. Correctly.', 'You picked falling. Interesting.'],
+    bWin: ['Blanket. Book. Rain. You\'re ninety years old.', 'The nook. You\'d cancel plans for that chair.'] },
+  { scale: 'heart', a: 'the soldier', b: 'the village',
+    aWin: ['You\'d run into the smoke. Brave. Or not great at risk.', 'The hero. You like being needed.'],
+    bWin: ['The quiet village. You\'d bring snacks, not swords.', 'Peace. You\'re the one who says "guys, calm down."'] },
+  { scale: 'heart', a: 'the chess game', b: 'the dinner table',
+    aWin: ['Checkmate. You play board games to win. Nobody likes it.', 'The chess. You keep score. Of everything.'],
+    bWin: ['The dinner. You\'d let someone else win. Just to keep the peace.', 'The table. You\'re the friend who books the restaurant.'] },
+  { scale: 'style', a: 'the velvet jacket', b: 'the black sweater',
+    aWin: ['The velvet. You dress for an audience.', 'Emerald velvet. Bold. Unnecessary. I approve.'],
+    bWin: ['Black sweater. You own seven of them. Identical.', 'Quiet luxury. You think logos are loud.'] },
+  { scale: 'style', a: 'the busy room', b: 'the empty room',
+    aWin: ['The busy room. Your walls have opinions.', 'Maximalist. You keep everything. Including grudges.'],
+    bWin: ['The empty room. Where you keep your feelings.', 'Minimal. You\'d throw this phone away if it had one extra button.'] },
+];
+// [title, tagline, superpower, flaw, role in a heist movie]. Names deliberately don't echo any picture.
+const TYPES = {
+  'social thrill fighter': ['The Main Character', 'You walk into rooms like there\'s a soundtrack. There isn\'t.',
+    'Making a plan sound exciting.', 'Making every plan about you.', 'The one who insists on a dramatic entrance.'],
+  'social thrill peace': ['The Life of the Party', 'Everyone\'s friend. Nobody\'s emergency contact.',
+    'Getting strangers to talk.', 'Leaving before the cleanup.', 'The distraction. Obviously.'],
+  'social calm fighter': ['The Protector', 'You\'d fight a bear for your friends. Then make them soup.',
+    'Showing up. Every time.', 'Holding grudges on other people\'s behalf.', 'The one who goes back for the guy left behind.'],
+  'social calm peace': ['The Sunbeam', 'Pure warmth. Exhausting, but warmth.',
+    'Making people feel like the favourite.', 'Saying yes to everything, then crying about it.', 'The one who brought snacks for the getaway car.'],
+  'solo thrill fighter': ['The Rogue', 'Mysterious. Or you just don\'t answer texts.',
+    'Doing the scary thing first.', 'Telling no one you were doing it.', 'The one who goes in alone and refuses backup.'],
+  'solo thrill peace': ['The Wanderer', 'Always leaving. Never explaining. Very cinematic.',
+    'Feeling at home anywhere.', 'Feeling at home nowhere for long.', 'The one who disappears with the map.'],
+  'solo calm fighter': ['The Quiet Storm', 'Calm on the outside. Plotting on the inside. I respect it.',
+    'Seeing three moves ahead.', 'Remembering everything you\'ve ever been wronged by.', 'The mastermind. You never even leave the van.'],
+  'solo calm peace': ['The Old Soul', 'You were born forty. You like tea. It\'s fine.',
+    'Being the calm in everyone\'s storm.', 'Postponing your life until it\'s "a better time".', 'The forger. Patient. Perfect. Home by nine.'],
+};
+// what each lean says about you: [mild, strong]
+const LEANS = {
+  energy: [['You like people. In doses.', 'You recharge in a crowd. Silence makes you check your phone.'],
+           ['You like people. From a distance.', 'You recharge alone. Other people are a lovely place to visit.']],
+  pace: [['You like a little danger. Supervised.', 'You chase the rush. Boredom scares you more than heights.'],
+         ['You like your heartbeat steady.', 'Your idea of an adventure is a new tea. You\'re thriving.']],
+  heart: [['You\'ll fight, if it\'s worth it.', 'You see a problem, you want to win against it. Personally.'],
+          ['You\'d rather fix it than win it.', 'You keep the peace. Even when you shouldn\'t.']],
+  style: [['You like to be noticed. A bit.', 'You dress for an audience. The audience is grateful.'],
+          ['You like things clean and quiet.', 'You own five identical shirts and call it a personality.']],
+};
+const SCALE_NAMES = { energy: ['Social', 'Solo'], pace: ['Thrill', 'Calm'], heart: ['Fighter', 'Peacekeeper'], style: ['Expressive', 'Minimal'] };
+
+let pairImgs = null;
+function preloadPairs() {
+  if (pairImgs) return;
+  pairImgs = PAIRS.map((_, i) => ['left', 'right'].map(s => { const im = new Image(); im.src = `personality/p${i}-${s}.jpg`; return im; }));
+}
+
+// Your left/right gaze right now, relative to `ref`. + = looking at the right side of the screen.
+function gazeSide(ref) {
+  return GAZE_FLIP * (face.eyeX - ref.x) - (face.yaw - ref.yaw) * 1.5;
+}
+// Calibration: what your eyes + head look like when you look at the left picture, and at the right one.
+// Then "where am I looking" = how far along the line from left to right you are (0 = left, 1 = right).
+const gcal = { ok: false, L: [0, 0], R: [0, 0] };
+async function sampleGaze(ms) {
+  let n = 0, x = 0, y = 0; const t0 = performance.now();
+  while (performance.now() - t0 < ms) {
+    if (face.present && !face.blinking) { n++; x += face.eyeX; y += face.yaw; }
+    await sleep(30);
+  }
+  return n ? [x / n, y / n] : [face.eyeX, face.yaw];
+}
+function gazeT(off) {
+  const dx = gcal.R[0] - gcal.L[0], dy = gcal.R[1] - gcal.L[1], d2 = dx * dx + dy * dy;
+  const px = face.eyeX - (gcal.L[0] + off[0]), py = face.yaw - (gcal.L[1] + off[1]);
+  return (px * dx + py * dy) / d2;
+}
+async function calibrateGaze() {
+  const el = $('#pairs'), L = $('#pickL'), R = $('#pickR');
+  L.querySelector('img').src = pairImgs[0][0].src; R.querySelector('img').src = pairImgs[0][1].src;
+  $('#pairsMeta').textContent = 'Quick check';
+  el.hidden = false; await sleep(30); el.classList.remove('hide');
+  const step = async (pickEl, other, text) => {
+    $('#pairsMeta').textContent = text;
+    pickEl.classList.add('on'); other.classList.add('dim');
+    tone(660, .12, .04);
+    await sleep(1000); // time to turn your head there
+    const v = await sampleGaze(1000);
+    pickEl.classList.remove('on'); other.classList.remove('dim');
+    return v;
+  };
+  gcal.L = await step(L, R, '← Turn your head to this one');
+  gcal.R = await step(R, L, 'Now this one →');
+  const dx = gcal.R[0] - gcal.L[0], dy = gcal.R[1] - gcal.L[1];
+  gcal.ok = Math.hypot(dx, dy) > .05;
+  el.classList.add('hide'); await sleep(350); el.hidden = true;
+  return gcal.ok;
+}
+
+async function watchPair(i, swap) {
+  const el = $('#pairs'), L = $('#pickL'), R = $('#pickR');
+  const [aImg, bImg] = pairImgs[i];
+  L.querySelector('img').src = (swap ? bImg : aImg).src;
+  R.querySelector('img').src = (swap ? aImg : bImg).src;
+  $('#pairsMeta').textContent = i === 0 ? 'Warm-up' : `${i} of ${PAIRS.length - 1}`;
+  L.classList.remove('on'); R.classList.remove('on');
+  el.classList.add('centering'); el.hidden = false;
+  await sleep(30); el.classList.remove('hide');
+
+  // look at the dot: that's "centre" for this pair (fixes any drift since calibration)
+  const c = await sampleGaze(800);
+  const ref = { x: c[0], yaw: c[1] };
+  const off = [c[0] - (gcal.L[0] + gcal.R[0]) / 2, c[1] - (gcal.L[1] + gcal.R[1]) / 2];
+  el.classList.remove('centering');
+
+  // choose: turn your head toward one and hold it there, or tap it
+  $('#pairsMeta').textContent = (i === 0 ? 'Warm-up · ' : `${i} of ${PAIRS.length - 1} · `) + 'turn your head to choose';
+  const T = .05, HOLD = 1000, MAX = 7000, start = performance.now();
+  let side = 0, first = 0, firstAt = 0, switches = 0, dwL = 0, dwR = 0, last = start, sm = .5, held = 0, chosen = 0;
+  L.onclick = () => { chosen = -1; }; R.onclick = () => { chosen = 1; };
+  while (!chosen && performance.now() - start < MAX) {
+    const now = performance.now(), dt = now - last; last = now;
+    let s = 0;
+    if (face.present && !face.blinking) {
+      if (gcal.ok) { sm = lerp(sm, gazeT(off), .3); s = sm < .32 ? -1 : sm > .68 ? 1 : 0; }
+      else { sm = lerp(sm, gazeSide(ref), .3); s = sm < -T ? -1 : sm > T ? 1 : 0; }
+    } else if (!camOK && pointer) s = pointer.x < W / 2 ? -1 : 1;
+    if (s === -1) dwL += dt; else if (s === 1) dwR += dt;
+    if (s && !first && now - start > 250) { first = s; firstAt = now - start; }
+    if (s && side && s !== side) { switches++; held = 0; }
+    if (s) side = s;
+    held = s ? held + dt : Math.max(0, held - dt * 2);
+    if (held >= HOLD) chosen = side;
+    L.classList.toggle('on', s === -1); R.classList.toggle('on', s === 1);
+    L.style.setProperty('--hold', side === -1 ? clamp(held / HOLD, 0, 1) : 0);
+    R.style.setProperty('--hold', side === 1 ? clamp(held / HOLD, 0, 1) : 0);
+    await sleep(30);
+  }
+  L.onclick = R.onclick = null;
+  if (!chosen && dwL + dwR > 800) chosen = dwL > dwR ? -1 : 1; // ran out of time: whichever you leaned to most
+  const decidedAt = performance.now() - start;
+  if (chosen) { // lock it in
+    (chosen === -1 ? L : R).classList.add('chosen'); (chosen === -1 ? R : L).classList.add('lost');
+    tone(880, .15, .05); setTimeout(() => tone(1320, .2, .04), 90);
+    await sleep(700);
+  }
+  el.classList.add('hide');
+  await sleep(350); el.hidden = true;
+  for (const p of [L, R]) { p.classList.remove('on', 'chosen', 'lost'); p.style.setProperty('--hold', 0); }
+
+  // convert screen sides back to options A/B
+  const firstA = first ? (first === -1) !== swap : null;
+  const share = !chosen ? .5 : (chosen === -1) !== swap ? 1 : 0;
+  return { share, firstA, firstAt: chosen ? decidedAt : 0, switches, total: chosen ? 1000 : 0 };
+}
+
+function roastPair(p, r) {
+  const winA = r.share >= .5, win = winA ? p.a : p.b, lose = winA ? p.b : p.a;
+  if (r.total < 600) return ['Neither? You\'re hard to please. Noted.', 'sulk'];
+  if (r.switches >= 5) return ['Pick one. It\'s a picture, not a mortgage.', 'annoyed'];
+  if (r.firstA !== null && r.firstA !== winA && Math.random() < .7) return [`You went to ${lose} first. Then switched to ${win}. Liar.`, 'quizzical'];
+  if (r.firstAt > 5000) return [`${(r.firstAt / 1000).toFixed(1)} seconds for ${win}? It's a picture. Not a mortgage.`, 'annoyed'];
+  if (r.firstAt && r.firstAt < 1800 && Math.random() < .4) return [`${cap(win)}. Instantly. You didn't even look at ${lose}. Rude.`, 'smug'];
+  return [pick(winA ? p.aWin : p.bWin), winA ? 'happy' : 'smug'];
+}
+
+async function personalityRead() {
+  preloadPairs();
+  setMood('quizzical');
+  await say('Now. Let me read you.');
+  await sleep(400);
+  setMood('smug');
+  await say('I\'ll show you two pictures. Turn your head toward the one you like.');
+  await sleep(300);
+  await say('Hold it there for a second. Or just tap it. Don\'t think.');
+  await sleep(400);
+  const narrowPhone = Math.min(W, H) < 500 && H > W;
+  if (narrowPhone) {
+    setMood('quizzical');
+    await say('Turn me sideways. I need to see the whole picture.');
+    const turned = await waitUntil(() => innerWidth > innerHeight, 6000);
+    await sleep(600); // let the layout settle
+    setMood(turned ? 'happy' : 'sulk');
+    await say(turned ? 'Better.' : 'Fine. Squint, then.');
+  }
+  setMood('calm');
+  await say('First, a practice. Turn your head to the glowing one.');
+  await sleep(300);
+  const calOk = camOK ? await calibrateGaze() : false;
+  if (camOK && !calOk) {
+    setMood('quizzical');
+    await say('You barely moved. Turn your whole head. Be dramatic. I like drama.');
+    await sleep(600);
+    await calibrateGaze();
+  }
+  setMood('calm');
+  await say('Good. Look at the dot first. Then turn to the one you like.');
+  await sleep(700);
+
+  const scores = { energy: [], pace: [], heart: [], style: [] }, results = [];
+  for (let i = 0; i < PAIRS.length; i++) {
+    const p = PAIRS[i], r = await watchPair(i, Math.random() < .5);
+    if (p.scale) { scores[p.scale].push(r.share); if (r.total >= 600) results.push({ p, r }); }
+    const [line, mood] = i === 0 && r.total >= 600 ? [pick(r.share >= .5 ? p.aWin : p.bWin), 'happy'] : roastPair(p, r);
+    setMood(mood);
+    await say(line, 34);
+    if (i === 0) { await sleep(300); setMood('calm'); await say('Warm-up\'s over. Now it counts.', 34); }
+    await sleep(500);
+  }
+
+  // the diagnosis
+  if (innerWidth > innerHeight && Math.min(innerWidth, innerHeight) < 500) { // phone still sideways
+    setMood('calm');
+    await say('You can turn me back now.');
+    await waitUntil(() => innerHeight > innerWidth, 5000);
+    await sleep(500);
+  }
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : .5;
+  const v = { energy: avg(scores.energy), pace: avg(scores.pace), heart: avg(scores.heart), style: avg(scores.style) };
+  const key = `${v.energy >= .5 ? 'social' : 'solo'} ${v.pace >= .5 ? 'thrill' : 'calm'} ${v.heart >= .5 ? 'fighter' : 'peace'}`;
+  const [title, tagline, power, flaw, heist] = TYPES[key];
+  const twist = Math.abs(v.style - .5) < .08 ? 'Style: whatever was on the chair.' : v.style > .5 ? 'Style: very loud shoes.' : 'Style: a perfectly ironed black T-shirt.';
+
+  // your two strongest leans, in words
+  const leanLines = ['energy', 'pace', 'heart', 'style']
+    .map(k => ({ k, d: Math.abs(v[k] - .5) }))
+    .sort((x, y) => y.d - x.d).slice(0, 2)
+    .map(({ k, d }) => LEANS[k][v[k] >= .5 ? 0 : 1][d > .2 ? 1 : 0]);
+
+  // evidence: what your eyes actually did
+  const clues = [];
+  const winOf = ({ p, r }) => r.share >= .5 ? [p.a, p.b] : [p.b, p.a];
+  if (results.length) {
+    const timed = results.filter(x => x.r.firstAt);
+    const sure = timed.length ? timed.reduce((x, y) => y.r.firstAt < x.r.firstAt ? y : x) : results[0];
+    const [w, l] = winOf(sure);
+    clues.push(sure.r.firstAt ? `${cap(w)} over ${l}: decided in ${(sure.r.firstAt / 1000).toFixed(1)}s. Not even close.` : `${cap(w)} over ${l}. No hesitation.`);
+    const torn = results.reduce((x, y) => (y.r.switches * 1500 + y.r.firstAt) > (x.r.switches * 1500 + x.r.firstAt) ? y : x);
+    if (torn !== sure) {
+      const [tw, tl] = winOf(torn);
+      clues.push(torn.r.switches >= 2 ? `${cap(tw)} vs ${tl} broke you. You switched ${torn.r.switches} times.` : `${cap(tw)} vs ${tl} took you ${(torn.r.firstAt / 1000).toFixed(1)}s. You don't know yourself there.`);
+    }
+    if (timed.length) {
+      const ms = avg(timed.map(x => x.r.firstAt));
+      clues.push(ms < 2200 ? `${(ms / 1000).toFixed(1)}s per choice on average. You decide first and explain later.`
+        : ms < 3800 ? `${(ms / 1000).toFixed(1)}s per choice on average. You check before you leap.`
+        : `${(ms / 1000).toFixed(1)}s per choice on average. Careful. Or scared.`);
+    }
+  } else clues.push('You didn\'t pick a single thing. Either you\'re a mystery or my camera is.');
+
+  setMood('quizzical');
+  await say('Hmm.');
+  await sleep(900);
+  await say('Calculating. Judging. Mostly judging.');
+  await sleep(800);
+  setMood('surprised');
+  await say(`${name}. You are…`);
+  await sleep(600);
+
+  $('#readTitle').textContent = title;
+  $('#readLine').textContent = tagline;
+  $('#readLeans').innerHTML = leanLines.map(t => `<p>${t}</p>`).join('');
+  $('#readClues').innerHTML = clues.map(t => `<li>${t}</li>`).join('');
+  $('#readPower').textContent = power;
+  $('#readFlaw').textContent = flaw;
+  $('#readHeist').textContent = heist;
+  $('#readTwist').textContent = twist;
+  $('#readBars').innerHTML = Object.entries(v).map(([k, x]) => {
+    const [a, b] = SCALE_NAMES[k], pct = Math.round(x * 100);
+    return `<div class="scale-bar"><span>${a}</span><i><b style="left:${100 - pct}%"></b></i><span>${b}</span></div>`;
+  }).join('');
+  $('#reading').scrollTop = 0; $('#reading').hidden = false;
+  tone(660, .3, .04); setTimeout(() => tone(990, .4, .04), 160);
+  try { localStorage.setItem('theEye.type', title); } catch {}
+  await sleep(1200);
+  await waitUntil(() => readingDone, 40000);
+  readingDone = false;
+  $('#reading').hidden = true;
+  setMood('evil');
+  await say(`${title}. I knew it the moment you sat down.`);
+  await sleep(1200);
+}
+let readingDone = false;
+$('#readOk').addEventListener('click', () => { readingDone = true; });
+
+// ---------- Chapter 2 ----------
+async function chapterTwo(continuing = false) {
+  setMood('calm'); live = false; contest.active = false; storyWatch.active = false; hud(false);
+  if (!name || name === 'Nobody') name = recallName() || 'Nobody';
+  if (T.open < 1) await wake();
+  if (!camOK || !landmarker) {
+    setMood('sulk');
+    await say('I can\'t see you. No camera, no chapter two.');
+    await sleep(800);
+    showEnd('It can\'t see you', 'The eye needs your camera to play. Allow camera access and reload the page.', 'Try again');
+    return;
+  }
+  setMood('happy');
+  await say(continuing ? `Right. Where were we, ${name}?` : `Chapter two, ${name}. You came back.`);
+  await sleep(500);
+  await flyFollow();
+  await breather();
+  await jealousEye();
+  await breather();
+  await copycat();
+  setMood('quizzical');
+  await say('That\'s all for now. More soon.');
+  await sleep(500);
+  await say('Go on. I\'ll be watching.');
+  await sleep(1400);
+  nextChapter = 1;
+  showEnd('To be continued', `The eye knows you now, ${name}. It will remember.`, 'Play from the start');
+}
+
+// ---------- The whole chapter ----------
+let nextChapter = 1;
+// A pause between games: the eye relaxes, maybe says something small, and you get to breathe
+const BREATHS = ['Okay. Breathe.', 'Relax your face. You look tense.'];
+async function breather() {
+  hud(false); glance = null; T.hypno = 0;
+  await sayChain; // let any line still typing finish first
+  setMood('calm'); live = true; // a short pause, but never a blank screen: it always says something
+  await sleep(800);
+  await say(pick(BREATHS));
+  await sleep(900);
+  live = false;
+}
+
+async function story() {
+  setMood('calm'); live = false; contest.active = false; storyWatch.active = false; hud(false);
+  await wake();
+  live = true;
+  await meet();
+  if (!camOK || !landmarker) {
+    setMood('sulk');
+    await say(`I had games planned, ${name}. But I can't see you.`);
+    await sleep(800);
+    showEnd('It can\'t see you', 'The eye needs your camera to play. Allow camera access and reload the page.', 'Try again');
+    return;
+  }
+  live = false; // scenes below do their own watching
+  await proveIt();
+  await breather();
+  await staringMatch();
+  await breather();
+  await snakeGame();
+  await breather();
+  await joinStars();
+  await breather();
+  await readFace(); // last: it ends on your ridiculous-face photo
+  await breather();
+  live = true;
+  setMood('calm');
+  await say(`That's all for now, ${name}.`);
+  await sleep(600);
+  setMood('smug');
+  await say('Go on. Leave. I\'ll be watching.');
+  await sleep(1600);
+  nextChapter = 1;
+  showEnd('To be continued', `The eye knows you now, ${name}. It will remember.`, 'Play again');
+}
+
+// Two buttons on the end screen; resolves true for the first one
+function askChoice(title, text, yes, no) {
+  return new Promise(resolve => {
+    $('#endTitle').textContent = title; $('#endText').textContent = text;
+    $('#again').textContent = yes; $('#stop').textContent = no; $('#stop').hidden = false;
+    choiceResolver = resolve; $('#end').hidden = false;
+  });
+}
+let choiceResolver = null;
+$('#stop').addEventListener('click', () => {
+  $('#end').hidden = true; $('#stop').hidden = true;
+  const r = choiceResolver; choiceResolver = null; r?.(false);
+});
+
+// A short title between chapters, no button
+async function titleCard(title, text) {
+  hud(false);
+  $('#endTitle').textContent = title; $('#endText').textContent = text;
+  $('#again').parentElement.hidden = true; $('#end').hidden = false;
+  tone(220, .6, .04, 'sine'); setTimeout(() => tone(330, .8, .03, 'sine'), 250);
+  await sleep(4200);
+  $('#end').hidden = true; $('#again').parentElement.hidden = false;
+}
+
+// ---------- Mood gallery (open the page with #moods) for tuning expressions ----------
+if (location.hash === '#moods') {
+  $('#intro').hidden = true; T.open = 1;
+  (async () => {
+    for (;;) for (const m of Object.keys(MOODS)) {
+      setMood(m); if (m === 'evil') T.laugh = 1;
+      $('#line').textContent = m;
+      await sleep(2600);
+    }
+  })();
+}
+
+// Open the page with #snaketest to play the snake with the mouse, no camera
+if (location.hash === '#starstest') { // the star game with the mouse, no camera
+  $('#intro').hidden = true; T.open = 1;
+  joinStars();
+}
+if (location.hash === '#snaketest') {
+  $('#intro').hidden = true; T.open = 1;
+  snakeGame();
+}
+
+// Open the page with #flytest to play the fly scene with mouse/touch, no camera (for tuning)
+if (location.hash === '#flytest') {
+  $('#intro').hidden = true; T.open = 1;
+  addEventListener('pointerdown', () => { if (!audioCtx) try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }, { once: true });
+  flyFollow();
+}
+
+// Open the page with #jealoustest to try the jealous eye with the mouse, no camera
+if (location.hash === '#jealoustest') {
+  $('#intro').hidden = true; T.open = 1;
+  jealousEye();
+}
+
+// Open the page with #readtest to try the personality read with the mouse, no camera
+if (location.hash === '#readtest') {
+  $('#intro').hidden = true; T.open = 1;
+  personalityRead();
+}
+
+// Open the page with #storytest to watch the cat story (no camera, so no blinks)
+if (location.hash === '#storytest') {
+  $('#intro').hidden = true; T.open = 1;
+  addEventListener('pointerdown', () => { if (!audioCtx) try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }, { once: true });
+  tellStory();
+}
+
+// Wide front cameras (e.g. newer iPhones) leave your face tiny in the frame, so the eyes get too few pixels.
+// Where the browser lets us, zoom the camera in until your face fills a sensible part of the picture.
+async function autoZoom() {
+  const t = video.srcObject?.getVideoTracks?.()[0], z = t?.getCapabilities?.().zoom;
+  if (!z || !(z.max > z.min)) return;
+  let zoom = t.getSettings().zoom || z.min;
+  for (let i = 0; i < 4; i++) {
+    await sleep(1200);
+    if (!face.present || face.size > .3) continue;
+    const want = clamp(zoom * .34 / Math.max(face.size, .05), z.min, Math.min(z.max, 2.5));
+    if (want - zoom < .1) return;
+    try { await t.applyConstraints({ advanced: [{ zoom: want }] }); zoom = want; base.size = 0; } catch { return; }
+  }
+}
+
+// #debug: live tracking numbers in a corner (numbers only, no picture), to see why a phone struggles
+function startDebug() {
+  const box = document.createElement('pre');
+  box.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99;margin:0;padding:8px 10px;background:rgba(0,0,0,.75);color:#9f9;font:12px/1.4 ui-monospace,monospace;border-radius:8px;pointer-events:none';
+  document.body.appendChild(box);
+  let lastN = 0, lastT = performance.now(), fps = 0;
+  setInterval(() => {
+    const now = performance.now(); fps = Math.round((trackedFrames - lastN) * 1000 / (now - lastT)); lastN = trackedFrames; lastT = now;
+    const t = video.srcObject?.getVideoTracks?.()[0], st = t?.getSettings?.() || {};
+    box.textContent = [
+      `video   ${video.videoWidth}x${video.videoHeight}  zoom ${st.zoom ?? '-'}`,
+      `tracker ${trackerDelegate}  ${fps} fps`,
+      `face    ${face.present ? 'yes' : 'NO'}  size ${face.size.toFixed(2)}  near ${face.near.toFixed(2)}`,
+      `eyelid  ${face.ear.toFixed(3)} / open ${base.ear.toFixed(3)}  blinkScore ${face.bl.toFixed(2)}`,
+      `blinks  ${face.blinks}  calibrated ${calib.done ? 'yes' : 'no'}`,
+      `smile ${(face.ex.smile || 0).toFixed(2)} jaw ${(face.ex.jaw || 0).toFixed(2)} brows ${(face.ex.browUp || 0).toFixed(2)}/${(face.ex.browDown || 0).toFixed(2)}`,
+    ].join('\n');
+  }, 250);
+}
+
+// ---------- Start ----------
+$('#wake').addEventListener('click', async () => {
+  $('#wake').disabled = true; $('#wake').textContent = 'Waking…';
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); await audioCtx.resume(); } catch {}
+  const trackerReady = loadTracker();
+  let stream = null;
+  const tries = [
+    { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: { echoCancellation: true, noiseSuppression: true } },
+    { video: { facingMode: 'user' } },
+    { audio: true },
+  ];
+  for (const c of tries) {
+    try { stream = await navigator.mediaDevices.getUserMedia(c); break; } catch (e) { console.warn('getUserMedia failed', c, e); }
+  }
+  if (stream) {
+    if (stream.getVideoTracks().length) { video.srcObject = stream; try { await video.play(); } catch {} camOK = true; }
+    if (audioCtx) setupMic(stream);
+  }
+  setupSpeech();
+  $('#intro').hidden = true; $('#status').hidden = false;
+  if (camOK) await Promise.race([trackerReady, sleep(8000)]);
+  if (camOK && landmarker) { autoZoom(); if (location.hash === '#debug') startDebug(); await setupCamera(); }
+  // shortcuts for testing one scene with the camera: #fly, #stare, #story, #ch2, #copy, #jealous
+  const solo = { '#stars': joinStars, '#snake': snakeGame, '#face': readFace, '#fly': flyFollow, '#story': dontBlinkStory, '#stare': staringMatch, '#copy': copycat, '#jealous': jealousEye }[location.hash];
+  if (solo) { T.open = 1; name = recallName() || 'Nobody'; await solo(); showEnd('That\'s the scene', 'Reload without the # to play the whole game.', 'Play from the start'); }
+  else location.hash === '#ch2' ? chapterTwo() : story();
+});
+$('#again').addEventListener('click', () => {
+  $('#end').hidden = true; $('#stop').hidden = true;
+  if (choiceResolver) { const r = choiceResolver; choiceResolver = null; r(true); return; }
+  $('#line').textContent = '';
+  nextChapter === 2 ? chapterTwo() : story();
+});
+</script>
+</body>
+</html>
