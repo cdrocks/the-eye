@@ -3261,8 +3261,13 @@ $('#wake').addEventListener('click', async () => {
   try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); await audioCtx.resume(); } catch {}
   const trackerReady = loadTracker();
   let stream = null;
-  const tries = [
-    { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: { echoCancellation: true, noiseSuppression: true } },
+  // iPhones and iPads: while a page holds the microphone, iOS plays its sound through the tiny earpiece speaker
+  // (the one for phone calls), so the game sounds silent. There we skip the always-on mic: speech-to-text
+  // still hears your name, and you can always type it.
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const cam = { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+  const tries = iOS ? [{ video: cam }, { video: { facingMode: 'user' } }] : [
+    { video: cam, audio: { echoCancellation: true, noiseSuppression: true } },
     { video: { facingMode: 'user' } },
     { audio: true },
   ];
