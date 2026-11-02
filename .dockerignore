@@ -1,0 +1,3 @@
+personality/
+*.md
+deploy.sh
